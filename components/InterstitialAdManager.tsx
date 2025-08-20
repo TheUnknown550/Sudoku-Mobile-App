@@ -1,6 +1,6 @@
 import { Alert, Platform } from 'react-native';
 
-// Interstitial ad unit ID for ad breaks
+// Production interstitial ad unit ID for ad breaks
 const INTERSTITIAL_AD_UNIT_ID = Platform.select({
   ios: 'ca-app-pub-9992987709866316/8112155581',
   android: 'ca-app-pub-9992987709866316/8112155581', 
@@ -14,7 +14,7 @@ const TEST_INTERSTITIAL_AD_UNIT_ID = Platform.select({
   default: 'ca-app-pub-3940256099942544/1033173712',
 });
 
-// Use test ads during development
+// Use production ads for release builds, test ads for development
 const AD_UNIT_ID = __DEV__ ? TEST_INTERSTITIAL_AD_UNIT_ID : INTERSTITIAL_AD_UNIT_ID;
 
 // Mock Interstitial for Expo Go development

@@ -10,28 +10,35 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "googleMobileAdsAppId": "ca-app-pub-9992987709866316~3478776009"
+      "googleMobileAdsAppId": "ca-app-pub-9992987709866316~3478776009",
+      "bundleIdentifier": "com.mcxstudios24.sudokumaster",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "googleMobileAdsAppId": "ca-app-pub-9992987709866316~3478776009",
-      "package": "com.anonymous.SudokuMaster"
+      "package": "com.mcxstudios24.sudokumaster",
+      "versionCode": 1,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

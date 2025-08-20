@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 
-// Test ad unit ID for development
+// Production rewarded ad unit ID
 const REWARDED_AD_UNIT_ID = Platform.select({
+  ios: 'ca-app-pub-9992987709866316/2345678901', // Replace with your actual iOS rewarded ad unit ID
+  android: 'ca-app-pub-9992987709866316/2345678901', // Replace with your actual Android rewarded ad unit ID
+  default: 'ca-app-pub-9992987709866316/2345678901',
+});
+
+// Test ad unit ID for development
+const TEST_REWARDED_AD_UNIT_ID = Platform.select({
   ios: 'ca-app-pub-3940256099942544/5224354917',
   android: 'ca-app-pub-3940256099942544/5224354917',
   default: 'ca-app-pub-3940256099942544/5224354917',
 });
+
+// Use production ads for release builds, test ads for development
+const AD_UNIT_ID = __DEV__ ? TEST_REWARDED_AD_UNIT_ID : REWARDED_AD_UNIT_ID;
 
 // Mock AdMob for Expo Go development
 class MockRewardedAdManager {
