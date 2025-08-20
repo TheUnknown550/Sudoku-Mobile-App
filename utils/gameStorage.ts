@@ -8,6 +8,7 @@ export interface GameRecord {
   timeCompleted?: number;
   duration?: number; // in seconds
   completed: boolean;
+  failed?: boolean; // true if game ended due to 3 wrong moves
   moves: number;
 }
 

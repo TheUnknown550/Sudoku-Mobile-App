@@ -1,10 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
-import { SavedGame, formatTime } from '../utils/gameStorage';
+import { GameRecord, SavedGame, clearCurrentGame, formatTime, saveGameRecord } from '../utils/gameStorage';
 import { isPuzzleComplete, isValidMove, isValidSudoku } from '../utils/sudokuLogic';
+import AnimatedCelebration from './AnimatedCelebration';
+import GameControls from './GameControls';
+import HintSystem from './HintSystem';
+import NumberHighlight from './NumberHighlight';
 import NumberPad from './NumberPad';
 import PauseMenu from './PauseMenu';
+import ProgressStats from './ProgressStats';
 import SudokuGrid from './SudokuGrid';
 
 interface SudokuGameProps {
@@ -42,6 +47,18 @@ export default function SudokuGame({
   const [showRestartConfirmModal, setShowRestartConfirmModal] = useState(false);
   const [winTime, setWinTime] = useState(0);
   
+  // New enhanced features state
+  const [hintsRemaining, setHintsRemaining] = useState(3);
+  const [hintsUsed, setHintsUsed] = useState(0);
+  const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
+  const [highlightedNumbers, setHighlightedNumbers] = useState<Set<number>>(new Set());
+  const [autoCheckEnabled, setAutoCheckEnabled] = useState(false);
+  const [moveHistory, setMoveHistory] = useState<Array<{row: number, col: number, oldValue: number | null, newValue: number | null}>>([]);
+  const [celebration, setCelebration] = useState<{visible: boolean, type: 'number-placed' | 'row-complete' | 'column-complete' | 'box-complete' | 'game-complete'}>({
+    visible: false, 
+    type: 'number-placed'
+  });
+  
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateRef = useRef(Date.now());
 
@@ -59,7 +76,6 @@ export default function SudokuGame({
   useEffect(() => {
     // Check if puzzle is complete
     if (grid.length > 0 && isPuzzleComplete(grid) && isValidSudoku(grid)) {
-      console.log('Win condition detected, showing modal');
       setIsComplete(true);
       stopTimer();
       const finalDuration = timeElapsed;
@@ -176,6 +192,9 @@ export default function SudokuGame({
             return newCount;
           });
           
+          // Count this as a move (including invalid moves)
+          setMoves(prev => prev + 1);
+          
           // Mark this cell as wrong temporarily
           const newWrongCells = { ...wrongCells };
           newWrongCells[cellKey] = true;
@@ -196,6 +215,17 @@ export default function SudokuGame({
         // Valid move - place the number
         newGrid[selectedCell.row][selectedCell.col] = number;
         setGrid(newGrid);
+        
+        // Add to move history for undo functionality
+        setMoveHistory(prev => [...prev, { 
+          row: selectedCell.row, 
+          col: selectedCell.col, 
+          oldValue, 
+          newValue: number 
+        }]);
+        
+        // Check for completions and trigger celebrations
+        checkForCompletions(newGrid, selectedCell.row, selectedCell.col);
         
         // Clear notes for this cell
         const newNotes = { ...notes };
@@ -221,10 +251,19 @@ export default function SudokuGame({
       } else {
         // Clear the number
         const newGrid = [...grid];
-        if (newGrid[selectedCell.row][selectedCell.col] !== null) {
+        const oldValue = newGrid[selectedCell.row][selectedCell.col];
+        if (oldValue !== null) {
           newGrid[selectedCell.row][selectedCell.col] = null;
           setGrid(newGrid);
           setMoves(prev => prev + 1);
+          
+          // Add to move history for undo functionality
+          setMoveHistory(prev => [...prev, { 
+            row: selectedCell.row, 
+            col: selectedCell.col, 
+            oldValue, 
+            newValue: null 
+          }]);
         }
         
         // Also clear notes for this cell
@@ -295,6 +334,103 @@ export default function SudokuGame({
     }
   };
 
+  // New enhanced feature functions
+  const handleHintUsed = (row: number, col: number, number: number) => {
+    if (hintsRemaining > 0) {
+      const newGrid = [...grid];
+      newGrid[row][col] = number;
+      setGrid(newGrid);
+      setHintsRemaining(prev => prev - 1);
+      setHintsUsed(prev => prev + 1);
+      setMoves(prev => prev + 1);
+      
+      // Add to move history
+      setMoveHistory(prev => [...prev, { row, col, oldValue: null, newValue: number }]);
+      
+      // Trigger celebration
+      setCelebration({ visible: true, type: 'number-placed' });
+      setTimeout(() => setCelebration({ visible: false, type: 'number-placed' }), 1000);
+    }
+  };
+
+  const handleUndo = () => {
+    if (moveHistory.length > 0) {
+      const lastMove = moveHistory[moveHistory.length - 1];
+      const newGrid = [...grid];
+      newGrid[lastMove.row][lastMove.col] = lastMove.oldValue;
+      setGrid(newGrid);
+      setMoveHistory(prev => prev.slice(0, -1));
+      setMoves(prev => Math.max(0, prev - 1));
+    }
+  };
+
+  const toggleAutoCheck = () => {
+    setAutoCheckEnabled(prev => !prev);
+  };
+
+  const getCompletionPercentage = (): number => {
+    let filledCells = 0;
+    for (let row = 0; row < 9; row++) {
+      for (let col = 0; col < 9; col++) {
+        if (grid[row][col] !== null) {
+          filledCells++;
+        }
+      }
+    }
+    return (filledCells / 81) * 100;
+  };
+
+  const updateHighlightedNumbers = () => {
+    if (selectedCell && grid[selectedCell.row][selectedCell.col] !== null) {
+      const selectedNum = grid[selectedCell.row][selectedCell.col]!;
+      setSelectedNumber(selectedNum);
+      setHighlightedNumbers(new Set([selectedNum]));
+    } else {
+      setSelectedNumber(null);
+      setHighlightedNumbers(new Set());
+    }
+  };
+
+  const checkForCompletions = (newGrid: (number | null)[][], row: number, col: number) => {
+    // Check if row is complete
+    if (newGrid[row].every(cell => cell !== null)) {
+      setCelebration({ visible: true, type: 'row-complete' });
+      setTimeout(() => setCelebration({ visible: false, type: 'row-complete' }), 1500);
+      return;
+    }
+
+    // Check if column is complete
+    if (newGrid.every(gridRow => gridRow[col] !== null)) {
+      setCelebration({ visible: true, type: 'column-complete' });
+      setTimeout(() => setCelebration({ visible: false, type: 'column-complete' }), 1500);
+      return;
+    }
+
+    // Check if 3x3 box is complete
+    const startRow = Math.floor(row / 3) * 3;
+    const startCol = Math.floor(col / 3) * 3;
+    let boxComplete = true;
+    for (let r = startRow; r < startRow + 3; r++) {
+      for (let c = startCol; c < startCol + 3; c++) {
+        if (newGrid[r][c] === null) {
+          boxComplete = false;
+          break;
+        }
+      }
+      if (!boxComplete) break;
+    }
+    
+    if (boxComplete) {
+      setCelebration({ visible: true, type: 'box-complete' });
+      setTimeout(() => setCelebration({ visible: false, type: 'box-complete' }), 1500);
+    }
+  };
+
+  // Update existing handleNumberPress to include new features
+  React.useEffect(() => {
+    updateHighlightedNumbers();
+  }, [selectedCell, grid]);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
@@ -328,32 +464,6 @@ export default function SudokuGame({
         >
           <Text style={[styles.headerButtonText, { color: theme.colors.textSecondary }]}>⋯</Text>
         </TouchableOpacity>
-        
-        {/* Auto-Win Test Button */}
-        <TouchableOpacity 
-          style={[styles.headerButton, { 
-            backgroundColor: theme.colors.warning,
-            shadowColor: theme.colors.shadow,
-          }]} 
-          onPress={() => {
-            console.log('Auto-win triggered');
-            // Create a simple solved grid for testing
-            const solvedGrid = [
-              [1, 2, 3, 4, 5, 6, 7, 8, 9],
-              [4, 5, 6, 7, 8, 9, 1, 2, 3],
-              [7, 8, 9, 1, 2, 3, 4, 5, 6],
-              [2, 3, 4, 5, 6, 7, 8, 9, 1],
-              [5, 6, 7, 8, 9, 1, 2, 3, 4],
-              [8, 9, 1, 2, 3, 4, 5, 6, 7],
-              [3, 4, 5, 6, 7, 8, 9, 1, 2],
-              [6, 7, 8, 9, 1, 2, 3, 4, 5],
-              [9, 1, 2, 3, 4, 5, 6, 7, 8]
-            ];
-            setGrid(solvedGrid);
-          }}
-        >
-          <Text style={[styles.headerButtonText, { color: theme.colors.background }]}>WIN</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Scrollable Content */}
@@ -362,49 +472,26 @@ export default function SudokuGame({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Game Stats */}
-        <View style={[styles.stats, {
-        backgroundColor: theme.colors.surface,
-        shadowColor: theme.colors.shadow,
-      }]}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: theme.colors.text }]}>
-            {formatTime(timeElapsed)}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Time</Text>
-        </View>
-        
-        <TouchableOpacity 
-          style={[styles.pauseButton, { 
-            backgroundColor: theme.colors.primary,
-            shadowColor: theme.colors.shadow,
-          }]}
-          onPress={handlePauseResume}
-        >
-          <Text style={styles.pauseButtonText}>
-            {isPaused ? '▶️' : '⏸️'}
-          </Text>
-        </TouchableOpacity>
-        
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: theme.colors.text }]}>
-            {moves}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Moves</Text>
-        </View>
-        
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: wrongMoves >= 2 ? theme.colors.error : theme.colors.text }]}>
-            {wrongMoves}/3
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Wrong</Text>
-        </View>
-      </View>
+        {/* Enhanced Progress Stats */}
+        <ProgressStats
+          timeElapsed={timeElapsed}
+          moves={moves}
+          hintsUsed={hintsUsed}
+          completionPercentage={getCompletionPercentage()}
+          wrongMoves={wrongMoves}
+        />
 
-      {/* Debug Info */}
-      <Text style={{color: theme.colors.text, textAlign: 'center', marginVertical: 5, fontSize: 12}}>
-        Win: {showWinModal ? 'YES' : 'NO'} | GameOver: {showGameOverModal ? 'YES' : 'NO'} | Complete: {isComplete ? 'YES' : 'NO'}
-      </Text>
+        {/* Game Controls */}
+        <GameControls
+          onPause={handlePauseResume}
+          onSettings={onSettings || (() => {})}
+          onRestart={() => setShowRestartConfirmModal(true)}
+          onUndo={handleUndo}
+          onAutoCheck={toggleAutoCheck}
+          isPaused={isPaused}
+          canUndo={moveHistory.length > 0}
+          autoCheckEnabled={autoCheckEnabled}
+        />
 
       {/* Edit Mode Toggle */}
       {!isPaused && (
@@ -476,6 +563,26 @@ export default function SudokuGame({
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      )}
+
+      {/* Number Progress Highlight */}
+      {!isPaused && (
+        <NumberHighlight
+          grid={grid}
+          selectedNumber={selectedNumber}
+          highlightedNumbers={highlightedNumbers}
+        />
+      )}
+
+      {/* Hint System */}
+      {!isPaused && (
+        <HintSystem
+          grid={grid}
+          originalGrid={originalGrid}
+          selectedCell={selectedCell}
+          onHintUsed={handleHintUsed}
+          hintsRemaining={hintsRemaining}
+        />
       )}
 
       {/* Sudoku Grid */}
@@ -551,12 +658,43 @@ export default function SudokuGame({
           <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>🎉 Congratulations!</Text>
             <Text style={[styles.modalText, { color: theme.colors.text }]}>
-              You solved the {savedGame.difficulty} puzzle in {formatTime(winTime)}!
+              You solved the {savedGame.difficulty} puzzle!
             </Text>
+            
+            {/* Time Display */}
+            <View style={{
+              backgroundColor: theme.colors.primary + '20',
+              borderRadius: 12,
+              paddingVertical: 12,
+              paddingHorizontal: 20,
+              marginVertical: 15,
+              alignItems: 'center',
+            }}>
+              <Text style={{
+                fontSize: 14,
+                color: theme.colors.textSecondary,
+                marginBottom: 4,
+              }}>Completion Time</Text>
+              <Text style={{
+                fontSize: 24,
+                fontWeight: 'bold',
+                color: theme.colors.primary,
+              }}>{formatTime(winTime)}</Text>
+            </View>
+            
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
                 onPress={() => {
+                  // Save completed game
+                  const completedGame: SavedGame = {
+                    ...savedGame,
+                    currentGrid: grid,
+                    timeElapsed: winTime,
+                    moves,
+                    lastPlayed: Date.now(),
+                  };
+                  onGameComplete(completedGame, winTime);
                   setShowWinModal(false);
                   onRestart();
                 }}
@@ -566,6 +704,15 @@ export default function SudokuGame({
               <TouchableOpacity 
                 style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: theme.colors.border }]}
                 onPress={() => {
+                  // Save completed game
+                  const completedGame: SavedGame = {
+                    ...savedGame,
+                    currentGrid: grid,
+                    timeElapsed: winTime,
+                    moves,
+                    lastPlayed: Date.now(),
+                  };
+                  onGameComplete(completedGame, winTime);
                   setShowWinModal(false);
                   onBackToMenu();
                 }}
@@ -594,15 +741,43 @@ export default function SudokuGame({
               <TouchableOpacity 
                 style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
                 onPress={() => {
+                  // Save failed game record
+                  const failedRecord: GameRecord = {
+                    id: savedGame.id,
+                    difficulty: savedGame.difficulty,
+                    timeStarted: savedGame.timeStarted,
+                    timeCompleted: Date.now(),
+                    duration: timeElapsed,
+                    completed: false,
+                    failed: true,
+                    moves: moves,
+                  };
+                  saveGameRecord(failedRecord);
+                  // Clear the current game since it's failed and can't be continued
+                  clearCurrentGame();
                   setShowGameOverModal(false);
                   onRestart();
                 }}
               >
-                <Text style={[styles.modalButtonText, { color: theme.colors.background }]}>Restart</Text>
+                <Text style={[styles.modalButtonText, { color: theme.colors.background }]}>New Game</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: theme.colors.border }]}
                 onPress={() => {
+                  // Save failed game record
+                  const failedRecord: GameRecord = {
+                    id: savedGame.id,
+                    difficulty: savedGame.difficulty,
+                    timeStarted: savedGame.timeStarted,
+                    timeCompleted: Date.now(),
+                    duration: timeElapsed,
+                    completed: false,
+                    failed: true,
+                    moves: moves,
+                  };
+                  saveGameRecord(failedRecord);
+                  // Clear the current game since it's failed and can't be continued
+                  clearCurrentGame();
                   setShowGameOverModal(false);
                   onBackToMenu();
                 }}
@@ -613,6 +788,13 @@ export default function SudokuGame({
           </View>
         </View>
       </Modal>
+
+      {/* Animated Celebration */}
+      <AnimatedCelebration
+        visible={celebration.visible}
+        type={celebration.type}
+        duration={1000}
+      />
     </View>
   );
 }

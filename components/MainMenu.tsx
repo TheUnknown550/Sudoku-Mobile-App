@@ -11,6 +11,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { getGameStats, loadCurrentGame, SavedGame } from '../utils/gameStorage';
 import { Difficulty } from '../utils/sudokuLogic';
+import DailyChallengeCard from './DailyChallengeCard';
 
 const { width, height } = Dimensions.get('window');
 
@@ -177,6 +178,9 @@ export default function MainMenu({
 
       <ScrollView style={styles.mainScrollView} contentContainerStyle={styles.mainScrollContent}>
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+          {/* Daily Challenge */}
+          <DailyChallengeCard onStartChallenge={onNewGame} />
+
           {/* User Stats Summary */}
           {userStats && userStats.totalGamesCompleted > 0 && (
           <View style={[styles.statsContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>

@@ -100,8 +100,12 @@ export default function HistoryRecords({ onBack }: HistoryRecordsProps) {
             </Text>
           </View>
           <View style={styles.recordStatus}>
-            <Text style={[styles.statusIcon, { color: record.completed ? theme.colors.success : theme.colors.warning }]}>
-              {record.completed ? '✅' : '⏱️'}
+            <Text style={[styles.statusIcon, { 
+              color: record.completed ? theme.colors.success : 
+                     record.failed ? theme.colors.error : 
+                     theme.colors.warning 
+            }]}>
+              {record.completed ? '✅' : record.failed ? '❌' : '⏱️'}
             </Text>
           </View>
         </View>
@@ -110,7 +114,8 @@ export default function HistoryRecords({ onBack }: HistoryRecordsProps) {
           <View style={styles.recordStat}>
             <Text style={[styles.recordStatLabel, { color: theme.colors.textSecondary }]}>Duration</Text>
             <Text style={[styles.recordStatValue, { color: theme.colors.text }]}>
-              {record.completed && record.duration ? formatDuration(record.duration) : 'Incomplete'}
+              {record.completed && record.duration ? formatDuration(record.duration) : 
+               record.failed ? 'Failed' : 'Incomplete'}
             </Text>
           </View>
           <View style={styles.recordStat}>
@@ -208,8 +213,8 @@ export default function HistoryRecords({ onBack }: HistoryRecordsProps) {
           {/* Records List */}
           {filteredRecords.length > 0 ? (
             <View style={styles.recordsList}>
-              {filteredRecords.slice(0, 20).map((record) => (
-                <RecordItem key={record.id} record={record} />
+              {filteredRecords.slice(0, 20).map((record, index) => (
+                <RecordItem key={`${record.id}-${record.timeStarted}-${index}`} record={record} />
               ))}
               {filteredRecords.length > 20 && (
                 <Text style={[styles.moreRecordsText, { color: theme.colors.textSecondary }]}>
