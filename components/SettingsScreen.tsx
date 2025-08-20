@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
     Alert,
     Dimensions,
+    Modal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -13,6 +14,9 @@ import {
 import { useAudio } from '../contexts/AudioContext';
 import { useTheme } from '../contexts/ThemeContext';
 import AchievementSystem, { Achievement } from './AchievementSystem';
+import DailyChallenges from './DailyChallenges';
+import GameAnalytics from './GameAnalytics';
+import Leaderboard from './Leaderboard';
 import { MusicPlayer } from './MusicPlayer';
 import StatsDashboard from './StatsDashboard';
 import ThemeSelector from './ThemeSelector';
@@ -32,6 +36,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStatsDashboard, setShowStatsDashboard] = useState(false);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [showGameAnalytics, setShowGameAnalytics] = useState(false);
+  const [showDailyChallenges, setShowDailyChallenges] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [autoSave, setAutoSave] = useState(true);
   const [showTimer, setShowTimer] = useState(true);
   const [highlightConflicts, setHighlightConflicts] = useState(true);
@@ -565,20 +572,66 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
 
         {/* Progress & Achievements Section */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Progress</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Progress & Achievements</Text>
           <View style={[styles.sectionContent, { backgroundColor: theme.colors.surface }]}>
+            <TouchableOpacity 
+              style={styles.aboutItem}
+              onPress={() => setShowLeaderboard(true)}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>🌍 Global Leaderboard</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                  Compete with players worldwide
+                </Text>
+              </View>
+              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>Rank #12 ›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.aboutItem}
+              onPress={() => setShowGameAnalytics(true)}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>📊 Game Analytics</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                  Detailed statistics and performance insights
+                </Text>
+              </View>
+              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>View ›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.aboutItem}
+              onPress={() => setShowDailyChallenges(true)}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>🎯 Daily Challenges</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                  Complete daily tasks for rewards and XP
+                </Text>
+              </View>
+              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>5 Active ›</Text>
+            </TouchableOpacity>
             <TouchableOpacity 
               style={styles.aboutItem}
               onPress={() => setShowAchievements(true)}
             >
-              <Text style={[styles.aboutTitle, { color: theme.colors.text }]}>🏆 Achievements</Text>
-              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>View ›</Text>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>🏆 Achievements</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                  View unlocked achievements and progress
+                </Text>
+              </View>
+              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>12/24 ›</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.aboutItem}
               onPress={() => setShowStatsDashboard(true)}
             >
-              <Text style={[styles.aboutTitle, { color: theme.colors.text }]}>📊 Statistics</Text>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>� Statistics</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                  Game history and performance tracking
+                </Text>
+              </View>
               <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>View ›</Text>
             </TouchableOpacity>
           </View>
@@ -743,6 +796,83 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         visible={showThemeSelector}
         onClose={() => setShowThemeSelector(false)}
       />
+
+      {/* Game Analytics Modal */}
+      <Modal
+        visible={showGameAnalytics}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowGameAnalytics(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowGameAnalytics(false)}>
+              <Text style={[styles.modalCloseButton, { color: theme.colors.primary }]}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <GameAnalytics />
+        </View>
+      </Modal>
+
+      {/* Daily Challenges Modal */}
+      <Modal
+        visible={showDailyChallenges}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowDailyChallenges(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowDailyChallenges(false)}>
+              <Text style={[styles.modalCloseButton, { color: theme.colors.primary }]}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <DailyChallenges 
+            onChallengeSelect={(challenge) => {
+              Alert.alert(
+                'Challenge Selected', 
+                `Starting: ${challenge.title}\n\n${challenge.description}`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Start Challenge', onPress: () => setShowDailyChallenges(false) }
+                ]
+              );
+            }}
+            onClaimReward={(challenge) => {
+              Alert.alert(
+                'Reward Claimed!', 
+                `${challenge.reward.description}\n\nGreat job completing: ${challenge.title}`,
+                [{ text: 'Awesome!', onPress: () => {} }]
+              );
+            }}
+          />
+        </View>
+      </Modal>
+
+      {/* Leaderboard Modal */}
+      <Modal
+        visible={showLeaderboard}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowLeaderboard(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowLeaderboard(false)}>
+              <Text style={[styles.modalCloseButton, { color: theme.colors.primary }]}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <Leaderboard 
+            onPlayerSelect={(player) => {
+              Alert.alert(
+                `${player.playerName}'s Profile`,
+                `Rank: #${player.rank}\nScore: ${player.score.toLocaleString()}\nBest Time: ${Math.floor(player.time / 60)}:${(player.time % 60).toString().padStart(2, '0')}\nDifficulty: ${player.difficulty}\n${player.badge ? `Badge: ${player.badge} Elite Player` : ''}`,
+                [{ text: 'Close', onPress: () => {} }]
+              );
+            }}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -862,5 +992,21 @@ const styles = StyleSheet.create({
     fontSize: isTablet ? 16 : 14,
     fontWeight: '500',
     marginTop: isTablet ? 12 : 8,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: isTablet ? 24 : 16,
+    paddingTop: isTablet ? 20 : 16,
+    paddingBottom: isTablet ? 16 : 12,
+  },
+  modalCloseButton: {
+    fontSize: isTablet ? 18 : 16,
+    fontWeight: '600',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
 });

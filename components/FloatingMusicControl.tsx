@@ -5,7 +5,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { useAudio } from '../contexts/AudioContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -16,21 +16,28 @@ const isTablet = width > 768;
 interface FloatingMusicControlProps {
   position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
   onPress?: () => void;
+  hideWhenModalOpen?: boolean;
+  modalVisible?: boolean;
 }
 
 export const FloatingMusicControl: React.FC<FloatingMusicControlProps> = ({
   position = 'top-right',
   onPress,
+  hideWhenModalOpen = true,
+  modalVisible = false,
 }) => {
   const { theme } = useTheme();
   const { isPlaying, isMusicEnabled, toggleMusic } = useAudio();
   const [expanded, setExpanded] = useState(false);
 
-  if (!isMusicEnabled) return null;
+  if (hideWhenModalOpen && modalVisible) return null;
+
+  // Debug: Show the control even if music is disabled for testing
+  // if (!isMusicEnabled || (hideWhenModalOpen && modalVisible)) return null;
 
   const getPositionStyle = () => {
     const offset = isTablet ? 20 : 16;
-    const topOffset = isTablet ? 60 : 50; // Account for status bar
+    const topOffset = isTablet ? 120 : 100; // Moved much lower to avoid header buttons
 
     switch (position) {
       case 'top-left':
@@ -47,10 +54,18 @@ export const FloatingMusicControl: React.FC<FloatingMusicControlProps> = ({
   };
 
   const handlePress = () => {
+    console.log('FloatingMusicControl pressed');
+    console.log('isPlaying:', isPlaying);
+    console.log('isMusicEnabled:', isMusicEnabled);
+    
+    // Always call toggleMusic first
+    console.log('Calling toggleMusic');
+    toggleMusic();
+    
+    // Then call custom onPress if provided (for additional functionality)
     if (onPress) {
+      console.log('Calling custom onPress');
       onPress();
-    } else {
-      toggleMusic();
     }
   };
 
@@ -60,12 +75,20 @@ export const FloatingMusicControl: React.FC<FloatingMusicControlProps> = ({
 
   return (
     <View style={[styles.container, getPositionStyle()]}>
+      {/* Status Indicator */}
+      <View style={[styles.statusIndicator, { backgroundColor: isPlaying ? '#FF6B35' : '#4ECDC4' }]}>
+        <Text style={styles.statusIndicatorText}>
+          {isPlaying ? '🎵' : '⏸️'}
+        </Text>
+      </View>
+      
       <TouchableOpacity
         style={[
           styles.button,
           {
-            backgroundColor: theme.colors.primary,
-            borderColor: theme.colors.border,
+            backgroundColor: isPlaying ? '#FF6B35' : '#4ECDC4', // Orange when playing, teal when paused
+            borderColor: isPlaying ? '#FF4500' : '#20B2AA',
+            borderWidth: 3,
           },
           expanded && styles.expandedButton,
         ]}
@@ -73,17 +96,17 @@ export const FloatingMusicControl: React.FC<FloatingMusicControlProps> = ({
         onLongPress={handleLongPress}
         activeOpacity={0.8}
       >
-        <Text style={[styles.icon, { color: theme.colors.surface }]}>
-          {isPlaying ? '⏸️' : '🎵'}
+        <Text style={[styles.icon, { color: 'white' }]}>
+          {isPlaying ? '⏸️' : '▶️'}
         </Text>
         
         {expanded && (
           <View style={styles.expandedContent}>
-            <Text style={[styles.trackText, { color: theme.colors.surface }]}>
+            <Text style={[styles.trackText, { color: 'white' }]}>
               Charm
             </Text>
-            <Text style={[styles.statusText, { color: theme.colors.surface }]}>
-              {isPlaying ? 'Playing' : 'Paused'}
+            <Text style={[styles.statusText, { color: 'white' }]}>
+              {isPlaying ? '🎵 PLAYING' : '⏸️ PAUSED'}
             </Text>
           </View>
         )}
@@ -91,16 +114,19 @@ export const FloatingMusicControl: React.FC<FloatingMusicControlProps> = ({
       
       {isPlaying && (
         <View style={styles.pulseContainer}>
-          {[1, 2, 3].map((_, index) => (
+          {[1, 2, 3, 4].map((_, index) => (
             <Animated.View
               key={index}
               style={[
                 styles.pulse,
-                { backgroundColor: theme.colors.primary + '40' },
+                { 
+                  backgroundColor: '#FFD700', // Gold color for pulse
+                  animationDelay: `${index * 200}ms`,
+                },
                 {
                   transform: [
                     {
-                      scale: new Animated.Value(1),
+                      scale: new Animated.Value(1 + index * 0.2),
                     },
                   ],
                 },
@@ -116,20 +142,20 @@ export const FloatingMusicControl: React.FC<FloatingMusicControlProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    zIndex: 1000,
+    zIndex: 500, // Lower than modals (1000) but higher than game content
   },
   button: {
-    width: isTablet ? 56 : 48,
-    height: isTablet ? 56 : 48,
-    borderRadius: isTablet ? 28 : 24,
+    width: isTablet ? 70 : 60, // Made bigger
+    height: isTablet ? 70 : 60, // Made bigger
+    borderRadius: isTablet ? 35 : 30,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
+    elevation: 12, // Higher elevation
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    borderWidth: 2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    borderWidth: 3,
   },
   expandedButton: {
     width: isTablet ? 140 : 120,
@@ -139,7 +165,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   icon: {
-    fontSize: isTablet ? 24 : 20,
+    fontSize: isTablet ? 30 : 24, // Bigger icon
+    fontWeight: 'bold',
   },
   expandedContent: {
     marginLeft: 8,
@@ -167,9 +194,25 @@ const styles = StyleSheet.create({
   },
   pulse: {
     position: 'absolute',
-    width: isTablet ? 56 : 48,
-    height: isTablet ? 56 : 48,
-    borderRadius: isTablet ? 28 : 24,
+    width: isTablet ? 70 : 60,
+    height: isTablet ? 70 : 60,
+    borderRadius: isTablet ? 35 : 30,
     opacity: 0.6,
+  },
+  statusIndicator: {
+    position: 'absolute',
+    top: -10,
+    right: -5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  statusIndicatorText: {
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

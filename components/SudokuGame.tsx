@@ -815,10 +815,9 @@ export default function SudokuGame({
       
       {/* Floating Music Control */}
       <FloatingMusicControl 
-        position="top-right"
-        onPress={() => {
-          // Optional: Could open a mini music player or just toggle
-        }}
+        position="bottom-right"
+        modalVisible={showPauseMenu || showWinModal || showGameOverModal || showRestartConfirmModal}
+        hideWhenModalOpen={true}
       />
     </View>
   );

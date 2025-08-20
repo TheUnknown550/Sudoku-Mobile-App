@@ -20,7 +20,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(0.5);
-  const [isMusicEnabled, setIsMusicEnabled] = useState(true);
+  const [isMusicEnabled, setIsMusicEnabled] = useState(true); // Force enabled for testing
   const [soundEffectsEnabled, setSoundEffectsEnabled] = useState(true);
 
   useEffect(() => {
@@ -116,7 +116,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleMusic = async () => {
-    if (!isMusicEnabled) return;
+    console.log('toggleMusic called');
+    console.log('isMusicEnabled:', isMusicEnabled);
+    console.log('current isPlaying:', isPlaying);
+    console.log('sound object:', sound);
+    
+    if (!isMusicEnabled) {
+      console.log('Music is not enabled, returning');
+      return;
+    }
 
     try {
       if (!sound) {
@@ -139,6 +147,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error toggling music:', error);
       // Fallback to demo mode
       setIsPlaying(!isPlaying);
+      console.log('Fallback to demo mode, new state:', !isPlaying);
     }
   };
 
