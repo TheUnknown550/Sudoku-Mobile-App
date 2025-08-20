@@ -8,9 +8,11 @@ interface GameControlsProps {
   onRestart: () => void;
   onUndo?: () => void;
   onAutoCheck?: () => void;
+  onHint?: () => void;
   isPaused: boolean;
   canUndo?: boolean;
   autoCheckEnabled?: boolean;
+  hintsRemaining?: number;
 }
 
 export default function GameControls({
@@ -19,9 +21,11 @@ export default function GameControls({
   onRestart,
   onUndo,
   onAutoCheck,
+  onHint,
   isPaused,
   canUndo = false,
   autoCheckEnabled = false,
+  hintsRemaining = 0,
 }: GameControlsProps) {
   const { theme } = useTheme();
 
@@ -100,6 +104,14 @@ export default function GameControls({
           label="Restart"
           onPress={onRestart}
         />
+        
+        {onHint && (
+          <ControlButton
+            icon="💡"
+            label={hintsRemaining > 0 ? `Hint (${hintsRemaining})` : "Watch Ad"}
+            onPress={onHint}
+          />
+        )}
       </View>
 
       {(onUndo || onAutoCheck) && (

@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useHints } from '../contexts/HintContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { GameRecord, SavedGame, clearCurrentGame, formatTime, saveGameRecord } from '../utils/gameStorage';
 import { isPuzzleComplete, isValidMove, isValidSudoku } from '../utils/sudokuLogic';
 import AnimatedCelebration from './AnimatedCelebration';
 import { FloatingMusicControl } from './FloatingMusicControl';
-import GameControls from './GameControls';
-import HintSystem from './HintSystem';
-import NumberHighlight from './NumberHighlight';
+import { AdBreakTrigger, adBreakController } from './InterstitialAdManager';
 import NumberPad from './NumberPad';
-import PauseMenu from './PauseMenu';
-import ProgressStats from './ProgressStats';
+import SimpleGameControls from './SimpleGameControls';
+import SimpleGameHeader from './SimpleGameHeader';
+import SimpleGameMenu from './SimpleGameMenu';
 import SudokuGrid from './SudokuGrid';
 
 // Get screen dimensions and calculate responsive values
@@ -36,6 +36,7 @@ export default function SudokuGame({
   onSettings 
 }: SudokuGameProps) {
   const { theme } = useTheme();
+  const { hintsRemaining, useHint, getHintStatus } = useHints();
   const [grid, setGrid] = useState<(number | null)[][]>(savedGame.currentGrid);
   const [originalGrid] = useState<(number | null)[][]>(savedGame.originalGrid);
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
@@ -54,7 +55,6 @@ export default function SudokuGame({
   const [winTime, setWinTime] = useState(0);
   
   // New enhanced features state
-  const [hintsRemaining, setHintsRemaining] = useState(3);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
   const [highlightedNumbers, setHighlightedNumbers] = useState<Set<number>>(new Set());
@@ -87,6 +87,9 @@ export default function SudokuGame({
       const finalDuration = timeElapsed;
       setWinTime(finalDuration);
       setShowWinModal(true);
+      
+      // Show ad break for puzzle completion
+      adBreakController.showAdBreak(AdBreakTrigger.PUZZLE_COMPLETED);
       
       // Don't call onGameComplete immediately - let the modal handle it
       // Save completed game for later
@@ -194,6 +197,8 @@ export default function SudokuGame({
             const newCount = prev + 1;
             if (newCount >= 3) {
               setShowGameOverModal(true);
+              // Show ad break for game over
+              adBreakController.showAdBreak(AdBreakTrigger.PUZZLE_FAILED);
             }
             return newCount;
           });
@@ -310,7 +315,10 @@ export default function SudokuGame({
 
   const handlePauseMenuMainMenu = () => {
     setShowPauseMenu(false);
-    onBackToMenu();
+    // Show ad break before going back to menu
+    adBreakController.showAdBreak(AdBreakTrigger.BACK_TO_MENU, () => {
+      onBackToMenu();
+    });
   };
 
   const handlePauseMenuRestart = () => {
@@ -324,7 +332,10 @@ export default function SudokuGame({
           style: 'destructive',
           onPress: () => {
             setShowPauseMenu(false);
-            onRestart();
+            // Show ad break before restarting
+            adBreakController.showAdBreak(AdBreakTrigger.GAME_RESTART, () => {
+              onRestart();
+            });
           }
         }
       ]
@@ -341,12 +352,12 @@ export default function SudokuGame({
   };
 
   // New enhanced feature functions
-  const handleHintUsed = (row: number, col: number, number: number) => {
-    if (hintsRemaining > 0) {
+  const handleHintUsed = async (row: number, col: number, number: number) => {
+    const success = await useHint();
+    if (success) {
       const newGrid = [...grid];
       newGrid[row][col] = number;
       setGrid(newGrid);
-      setHintsRemaining(prev => prev - 1);
       setHintsUsed(prev => prev + 1);
       setMoves(prev => prev + 1);
       
@@ -354,6 +365,37 @@ export default function SudokuGame({
       setMoveHistory(prev => [...prev, { row, col, oldValue: null, newValue: number }]);
       
       // Trigger celebration
+      setCelebration({ visible: true, type: 'number-placed' });
+      setTimeout(() => setCelebration({ visible: false, type: 'number-placed' }), 1000);
+    }
+  };
+
+  const handleShowHint = async () => {
+    const success = await useHint();
+    if (success) {
+      setHintsUsed(prev => prev + 1);
+      
+      // Generate a helpful hint
+      const hints = [
+        'Look for cells that can only contain one number.',
+        'Check if any row, column, or 3×3 box is missing just one number.',
+        'Focus on the most filled rows, columns, and boxes first.',
+        'Look for numbers that can only go in one place in a row, column, or box.',
+        'Check for pairs - when two cells can only contain the same two numbers.',
+        'Start with the numbers that appear most frequently on the board.',
+        'Look for empty cells in rows/columns that are almost complete.',
+        'Focus on 3×3 boxes that have the most numbers filled in.',
+      ];
+      
+      const randomHint = hints[Math.floor(Math.random() * hints.length)];
+      
+      Alert.alert(
+        '💡 Hint',
+        randomHint,
+        [{ text: 'Got it!', style: 'default' }]
+      );
+      
+      // Trigger celebration for using hint
       setCelebration({ visible: true, type: 'number-placed' });
       setTimeout(() => setCelebration({ visible: false, type: 'number-placed' }), 1000);
     }
@@ -439,232 +481,101 @@ export default function SudokuGame({
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { 
-        backgroundColor: theme.colors.surface,
-        shadowColor: theme.colors.shadow,
-      }]}>
-        <TouchableOpacity 
-          style={[styles.headerButton, { 
-            backgroundColor: theme.colors.background,
-            shadowColor: theme.colors.shadow,
-          }]} 
-          onPress={onSettings || (() => {})}
-          disabled={!onSettings}
-        >
-          <Text style={[styles.headerButtonText, { color: theme.colors.textSecondary }]}>⚙️</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.headerCenter}>
-          <Text style={[styles.difficulty, { color: getDifficultyColor() }]}>
-            {savedGame.difficulty.toUpperCase()}
-          </Text>
-        </View>
-        
-        <TouchableOpacity 
-          style={[styles.headerButton, { 
-            backgroundColor: theme.colors.background,
-            shadowColor: theme.colors.shadow,
-          }]} 
-          onPress={handlePauseMenuOpen}
-        >
-          <Text style={[styles.headerButtonText, { color: theme.colors.textSecondary }]}>⋯</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Simplified Header */}
+      <SimpleGameHeader
+        timeElapsed={timeElapsed}
+        onPause={handlePauseResume}
+        onMenu={() => setShowPauseMenu(true)}
+        isPaused={isPaused}
+        wrongMoves={wrongMoves}
+      />
 
-      {/* Responsive Content Layout */}
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          isTablet && styles.tabletScrollContent
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Responsive Grid Layout */}
-        <View style={isTablet && isLandscape ? styles.tabletLandscapeLayout : styles.mobileLayout}>
-          {/* Left side - Game Grid and Stats */}
-          <View style={isTablet && isLandscape ? styles.gameSection : styles.fullWidth}>
-            {/* Enhanced Progress Stats */}
-            <ProgressStats
-              timeElapsed={timeElapsed}
-              moves={moves}
-              hintsUsed={hintsUsed}
-              completionPercentage={getCompletionPercentage()}
-              wrongMoves={wrongMoves}
-            />
-
+      {/* Main Game Content */}
+      <View style={styles.gameContent}>
+        {!isPaused && (
+          <>
             {/* Game Controls */}
-            <GameControls
-              onPause={handlePauseResume}
-              onSettings={onSettings || (() => {})}
-              onRestart={() => setShowRestartConfirmModal(true)}
+            <SimpleGameControls
+              onHint={handleShowHint}
               onUndo={handleUndo}
-              onAutoCheck={toggleAutoCheck}
-              isPaused={isPaused}
+              hintsRemaining={hintsRemaining}
               canUndo={moveHistory.length > 0}
-              autoCheckEnabled={autoCheckEnabled}
+              editMode={editMode}
+              onToggleEditMode={() => setEditMode(!editMode)}
             />
 
-          {/* Edit Mode Toggle */}
-          {!isPaused && (
-            <View style={styles.editModeContainer}>
-          <TouchableOpacity
-            style={[
-              styles.editModeButton,
-              {
-                backgroundColor: editMode ? theme.colors.primary : theme.colors.surface,
-                borderColor: editMode ? theme.colors.primary : theme.colors.border,
-                borderWidth: 2,
-                shadowColor: theme.colors.shadow,
-                elevation: editMode ? 8 : 4,
-                shadowOffset: {
-                  width: 0,
-                  height: editMode ? 6 : 3,
-                },
-                shadowOpacity: 0.15,
-                shadowRadius: editMode ? 12 : 6,
-              }
-            ]}
-            onPress={() => setEditMode(!editMode)}
-            activeOpacity={0.8}
+            {/* Sudoku Grid */}
+            <SudokuGrid
+              grid={grid}
+              originalGrid={originalGrid}
+              selectedCell={selectedCell}
+              onCellPress={handleCellPress}
+              notes={notes}
+              wrongCells={wrongCells}
+            />
+
+            {/* Number Pad */}
+            <NumberPad
+              onNumberPress={handleNumberPress}
+              onClearPress={handleClearPress}
+              disabled={!selectedCell || isComplete}
+              currentGrid={grid}
+            />
+          </>
+        )}
+
+        {/* Pause Overlay */}
+        {isPaused && (
+          <TouchableOpacity 
+            style={[styles.pauseOverlay, { backgroundColor: theme.colors.overlay }]}
+            activeOpacity={1}
+            onPress={handlePauseResume}
           >
-            <Text style={[
-              styles.editModeIcon,
-              { color: editMode ? 'white' : theme.colors.text }
-            ]}>
-              ✏️
-            </Text>
-            <Text style={[
-              styles.editModeText,
-              { 
-                color: editMode ? 'white' : theme.colors.text,
-                fontWeight: '700',
-                letterSpacing: 0.5,
-              }
-            ]}>
-              {editMode ? 'Notes Mode' : 'Number Mode'}
-            </Text>
+            <View style={[styles.pauseCard, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.pauseTitle, { color: theme.colors.text }]}>Game Paused</Text>
+              <Text style={[styles.pauseSubtitle, { color: theme.colors.textSecondary }]}>
+                Tap anywhere to resume
+              </Text>
+              <TouchableOpacity 
+                style={[styles.resumeButton, { backgroundColor: theme.colors.primary }]}
+                onPress={handlePauseResume}
+              >
+                <Text style={styles.resumeButtonText}>▶️ Resume Game</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Instructions */}
-      {!isPaused && (
-        <Text style={[styles.instructions, { color: theme.colors.textSecondary }]}>
-          Tap an empty cell, then select a number below
-        </Text>
-      )}
-
-      {/* Pause Overlay */}
-      {isPaused && (
-        <TouchableOpacity 
-          style={[styles.pauseOverlay, { backgroundColor: theme.colors.overlay }]}
-          activeOpacity={1}
-          onPress={handlePauseResume}
-        >
-          <View style={[styles.pauseCard, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.pauseTitle, { color: theme.colors.text }]}>Game Paused</Text>
-            <Text style={[styles.pauseSubtitle, { color: theme.colors.textSecondary }]}>
-              Tap anywhere to resume
-            </Text>
-            <TouchableOpacity 
-              style={[styles.resumeButton, { backgroundColor: theme.colors.primary }]}
-              onPress={handlePauseResume}
-            >
-              <Text style={styles.resumeButtonText}>▶️ Resume Game</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {/* Number Progress Highlight */}
-      {!isPaused && (
-        <NumberHighlight
-          grid={grid}
-          selectedNumber={selectedNumber}
-          highlightedNumbers={highlightedNumbers}
-        />
-      )}
-
-      {/* Hint System */}
-      {!isPaused && (
-        <HintSystem
-          grid={grid}
-          originalGrid={originalGrid}
-          selectedCell={selectedCell}
-          onHintUsed={handleHintUsed}
-          hintsRemaining={hintsRemaining}
-        />
-      )}
-
-      {/* Sudoku Grid */}
-      {!isPaused && (
-        <SudokuGrid
-          grid={grid}
-          originalGrid={originalGrid}
-          selectedCell={selectedCell}
-          onCellPress={handleCellPress}
-          notes={notes}
-          wrongCells={wrongCells}
-        />
-      )}
-
-      {/* Number Pad */}
-      {!isPaused && (
-        <NumberPad
-          onNumberPress={handleNumberPress}
-          onClearPress={handleClearPress}
-          disabled={!selectedCell || isComplete}
-          currentGrid={grid}
-        />
-      )}
-
-      {/* Selected Cell Info */}
-      {selectedCell && !isPaused && (
-        <Text style={[styles.selectedInfo, { color: theme.colors.textSecondary }]}>
-          Selected: Row {selectedCell.row + 1}, Column {selectedCell.col + 1}
-        </Text>
-      )}
-      
-      {/* Close responsive layout containers */}
+        )}
       </View>
-      </View>
-      </ScrollView>
 
-      {/* Pause Overlay */}
-      {isPaused && (
-        <TouchableOpacity 
-          style={[styles.pauseOverlay, { backgroundColor: theme.colors.overlay }]}
-          activeOpacity={1}
-          onPress={handlePauseResume}
-        >
-          <View style={[styles.pauseCard, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.pauseTitle, { color: theme.colors.text }]}>Game Paused</Text>
-            <Text style={[styles.pauseSubtitle, { color: theme.colors.textSecondary }]}>
-              Tap anywhere to resume
-            </Text>
-            <TouchableOpacity 
-              style={[styles.resumeButton, { backgroundColor: theme.colors.primary }]}
-              onPress={handlePauseResume}
-            >
-              <Text style={styles.resumeButtonText}>▶️ Resume Game</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      )}
+      {/* Game Menu */}
+      <SimpleGameMenu
+        visible={showPauseMenu}
+        onClose={() => setShowPauseMenu(false)}
+        onContinue={() => {
+          setShowPauseMenu(false);
+          setIsPaused(false);
+        }}
+        onRestart={() => {
+          setShowPauseMenu(false);
+          setShowRestartConfirmModal(true);
+        }}
+        onSettings={() => {
+          setShowPauseMenu(false);
+          if (onSettings) onSettings();
+        }}
+        onMainMenu={() => {
+          setShowPauseMenu(false);
+          // Show ad break before going back to menu
+          adBreakController.showAdBreak(AdBreakTrigger.BACK_TO_MENU, () => {
+            onBackToMenu();
+          });
+        }}
+        timeElapsed={timeElapsed}
+        moves={moves}
+        wrongMoves={wrongMoves}
+      />
 
-      {/* Pause Menu */}
-      {showPauseMenu && (
-        <PauseMenu
-          onContinue={handlePauseMenuContinue}
-          onMainMenu={handlePauseMenuMainMenu}
-          onRestart={handlePauseMenuRestart}
-          onClose={handlePauseMenuClose}
-        />
-      )}
-
-      {/* Win Modal - Copy of Game Over Modal Structure */}
+      {/* Win Modal */}
       <Modal
         visible={showWinModal}
         transparent={true}
@@ -678,32 +589,15 @@ export default function SudokuGame({
               You solved the {savedGame.difficulty} puzzle!
             </Text>
             
-            {/* Time Display */}
-            <View style={{
-              backgroundColor: theme.colors.primary + '20',
-              borderRadius: 12,
-              paddingVertical: 12,
-              paddingHorizontal: 20,
-              marginVertical: 15,
-              alignItems: 'center',
-            }}>
-              <Text style={{
-                fontSize: 14,
-                color: theme.colors.textSecondary,
-                marginBottom: 4,
-              }}>Completion Time</Text>
-              <Text style={{
-                fontSize: 24,
-                fontWeight: 'bold',
-                color: theme.colors.primary,
-              }}>{formatTime(winTime)}</Text>
+            <View style={[styles.timeDisplay, { backgroundColor: theme.colors.primary + '20' }]}>
+              <Text style={[styles.timeLabel, { color: theme.colors.textSecondary }]}>Completion Time</Text>
+              <Text style={[styles.timeValue, { color: theme.colors.primary }]}>{formatTime(winTime)}</Text>
             </View>
             
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
                 onPress={() => {
-                  // Save completed game
                   const completedGame: SavedGame = {
                     ...savedGame,
                     currentGrid: grid,
@@ -713,15 +607,17 @@ export default function SudokuGame({
                   };
                   onGameComplete(completedGame, winTime);
                   setShowWinModal(false);
-                  onRestart();
+                  // Show ad break before starting new game
+                  adBreakController.showAdBreak(AdBreakTrigger.NEW_GAME_START, () => {
+                    onRestart();
+                  });
                 }}
               >
-                <Text style={[styles.modalButtonText, { color: theme.colors.background }]}>New Game</Text>
+                <Text style={[styles.modalButtonText, { color: 'white' }]}>New Game</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: theme.colors.border }]}
                 onPress={() => {
-                  // Save completed game
                   const completedGame: SavedGame = {
                     ...savedGame,
                     currentGrid: grid,
@@ -731,7 +627,10 @@ export default function SudokuGame({
                   };
                   onGameComplete(completedGame, winTime);
                   setShowWinModal(false);
-                  onBackToMenu();
+                  // Show ad break before going back to menu
+                  adBreakController.showAdBreak(AdBreakTrigger.BACK_TO_MENU, () => {
+                    onBackToMenu();
+                  });
                 }}
               >
                 <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Main Menu</Text>
@@ -750,15 +649,21 @@ export default function SudokuGame({
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Game Over</Text>
+            <Text style={[styles.modalTitle, { color: '#ff4757' }]}>💀 Game Over</Text>
             <Text style={[styles.modalText, { color: theme.colors.text }]}>
-              You have made 3 wrong moves. Game ended.
+              You made 3 wrong moves!{'\n'}Better luck next time.
             </Text>
+            
+            <View style={[styles.timeDisplay, { backgroundColor: '#ff4757' + '20' }]}>
+              <Text style={[styles.timeLabel, { color: theme.colors.textSecondary }]}>Final Time</Text>
+              <Text style={[styles.timeValue, { color: '#ff4757' }]}>{formatTime(timeElapsed)}</Text>
+            </View>
+            
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => {
-                  // Save failed game record
+                onPress={async () => {
+                  // Save failed game record to history
                   const failedRecord: GameRecord = {
                     id: savedGame.id,
                     difficulty: savedGame.difficulty,
@@ -769,19 +674,21 @@ export default function SudokuGame({
                     failed: true,
                     moves: moves,
                   };
-                  saveGameRecord(failedRecord);
-                  // Clear the current game since it's failed and can't be continued
-                  clearCurrentGame();
+                  await saveGameRecord(failedRecord);
+                  await clearCurrentGame();
                   setShowGameOverModal(false);
-                  onRestart();
+                  // Show ad break before starting new game
+                  adBreakController.showAdBreak(AdBreakTrigger.NEW_GAME_START, () => {
+                    onRestart();
+                  });
                 }}
               >
-                <Text style={[styles.modalButtonText, { color: theme.colors.background }]}>New Game</Text>
+                <Text style={[styles.modalButtonText, { color: 'white' }]}>Try Again</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: theme.colors.border }]}
-                onPress={() => {
-                  // Save failed game record
+                onPress={async () => {
+                  // Save failed game record to history
                   const failedRecord: GameRecord = {
                     id: savedGame.id,
                     difficulty: savedGame.difficulty,
@@ -792,14 +699,54 @@ export default function SudokuGame({
                     failed: true,
                     moves: moves,
                   };
-                  saveGameRecord(failedRecord);
-                  // Clear the current game since it's failed and can't be continued
-                  clearCurrentGame();
+                  await saveGameRecord(failedRecord);
+                  await clearCurrentGame();
                   setShowGameOverModal(false);
-                  onBackToMenu();
+                  // Show ad break before going back to menu
+                  adBreakController.showAdBreak(AdBreakTrigger.BACK_TO_MENU, () => {
+                    onBackToMenu();
+                  });
                 }}
               >
                 <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Main Menu</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Restart Confirmation Modal */}
+      <Modal
+        visible={showRestartConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowRestartConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Restart Game?</Text>
+            <Text style={[styles.modalText, { color: theme.colors.text }]}>
+              Your current progress will be lost.
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: theme.colors.border }]}
+                onPress={() => setShowRestartConfirmModal(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: '#ff4757' }]}
+                onPress={() => {
+                  setShowRestartConfirmModal(false);
+                  // Show ad break before restarting
+                  adBreakController.showAdBreak(AdBreakTrigger.GAME_RESTART, () => {
+                    onRestart();
+                  });
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: 'white' }]}>Restart</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -828,144 +775,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: isTablet ? 32 : 16,
   },
-  scrollView: {
+  gameContent: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: isTablet ? 40 : 20,
-  },
-  tabletScrollContent: {
-    paddingHorizontal: isTablet ? 40 : 0,
-    maxWidth: isTablet ? 1400 : '100%',
-    alignSelf: 'center',
-  },
-  tabletLandscapeLayout: {
-    flexDirection: 'row',
-    gap: 40,
-    alignItems: 'flex-start',
-  },
-  mobileLayout: {
-    flexDirection: 'column',
-  },
-  gameSection: {
-    flex: 1.2,
-    minWidth: 300,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? (isTablet ? 60 : 50) : 40,
-    paddingBottom: isTablet ? 20 : 16,
-    paddingHorizontal: isTablet ? 16 : 8,
-    marginHorizontal: isTablet ? -16 : -8,
-    borderRadius: isTablet ? 20 : 16,
-    marginBottom: isTablet ? 16 : 8,
-    shadowOffset: {
-      width: 0,
-      height: isTablet ? 6 : 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: isTablet ? 12 : 8,
-    elevation: isTablet ? 8 : 6,
-  },
-  backButton: {
-    width: 60,
-  },
-  backButtonText: {
-    fontSize: 18,
-    fontWeight: '500',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  difficulty: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  restartButton: {
-    width: 60,
-    alignItems: 'flex-end',
-  },
-  restartButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  headerButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  headerButtonText: {
-    fontSize: 18,
-  },
-  stats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    marginHorizontal: -8,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    gap: 32,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  pauseButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  pauseButtonText: {
-    fontSize: 20,
-  },
-  instructions: {
-    textAlign: 'center',
-    marginBottom: 12,
-    fontSize: 13,
-    paddingHorizontal: 16,
+    paddingVertical: 20,
   },
   pauseOverlay: {
     position: 'absolute',
@@ -1005,33 +817,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  selectedInfo: {
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-    fontSize: 12,
-    paddingHorizontal: 16,
-  },
-  editModeContainer: {
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  editModeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 2,
-  },
-  editModeIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  editModeText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -1064,6 +849,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 25,
     lineHeight: 22,
+  },
+  timeDisplay: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginVertical: 15,
+    alignItems: 'center',
+  },
+  timeLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  timeValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   modalButtons: {
     flexDirection: 'row',

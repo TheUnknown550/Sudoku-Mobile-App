@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Sudoku",
-    "slug": "Sudoku",
+    "name": "Sudoku Master",
+    "slug": "Sudoku Master",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,14 +9,17 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "googleMobileAdsAppId": "ca-app-pub-9992987709866316~3478776009"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "googleMobileAdsAppId": "ca-app-pub-9992987709866316~3478776009",
+      "package": "com.anonymous.SudokuMaster"
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +37,14 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9992987709866316~3478776009",
+          "iosAppId": "ca-app-pub-9992987709866316~3478776009"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
