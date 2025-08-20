@@ -65,7 +65,7 @@ export default function SudokuGame({
     type: 'number-placed'
   });
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastUpdateRef = useRef(Date.now());
 
   useEffect(() => {

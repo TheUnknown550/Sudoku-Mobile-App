@@ -1,6 +1,8 @@
 import HistoryRecords from '@/components/HistoryRecords';
 import MainMenu from '@/components/MainMenu';
 import SettingsScreen from '@/components/SettingsScreen';
+import { MCX_STUDIOS_CONFIG } from '@/components/SplashConfig';
+import SplashScreen from '@/components/SplashScreen';
 import SudokuGame from '@/components/SudokuGame';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -16,11 +18,11 @@ import { Difficulty, generateSudoku } from '@/utils/sudokuLogic';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-type AppState = 'menu' | 'game' | 'history' | 'settings';
+type AppState = 'splash' | 'menu' | 'game' | 'history' | 'settings';
 
 export default function HomeScreen() {
   const { theme } = useTheme();
-  const [appState, setAppState] = useState<AppState>('menu');
+  const [appState, setAppState] = useState<AppState>('splash');
   const [previousState, setPreviousState] = useState<AppState>('menu');
   const [currentGame, setCurrentGame] = useState<SavedGame | null>(null);
   const [gameKey, setGameKey] = useState(0);
@@ -108,6 +110,20 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {appState === 'splash' && (
+        <SplashScreen
+          onFinish={() => {
+            setAppState('menu');
+            loadSavedGame();
+          }}
+          config={{
+            ...MCX_STUDIOS_CONFIG,
+            tagline: "Master the Grid. Challenge Your Mind.",
+            duration: 3500,
+          }}
+        />
+      )}
+
       {appState === 'menu' && (
         <MainMenu
           onContinueGame={handleContinueGame}

@@ -21,7 +21,7 @@ interface NumberPadProps {
   onNumberPress: (number: number) => void;
   onClearPress: () => void;
   disabled: boolean;
-  currentGrid: number[][];
+  currentGrid: (number | null)[][];
 }
 
 export default function NumberPad({ onNumberPress, onClearPress, disabled, currentGrid }: NumberPadProps) {
@@ -35,7 +35,7 @@ export default function NumberPad({ onNumberPress, onClearPress, disabled, curre
     for (let row = 0; row < 9; row++) {
       for (let col = 0; col < 9; col++) {
         const num = currentGrid[row][col];
-        if (num !== 0) {
+        if (num !== null && num !== 0) {
           numberCounts[num] = (numberCounts[num] || 0) + 1;
         }
       }
