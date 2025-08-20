@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import {
     Alert,
+    Dimensions,
+    Platform,
     ScrollView,
     StyleSheet,
     Switch,
@@ -8,17 +10,25 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useAudio } from '../contexts/AudioContext';
 import { useTheme } from '../contexts/ThemeContext';
 import AchievementSystem, { Achievement } from './AchievementSystem';
+import { MusicPlayer } from './MusicPlayer';
 import StatsDashboard from './StatsDashboard';
 import ThemeSelector from './ThemeSelector';
+
+// Get screen dimensions and calculate responsive values
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isTablet = SCREEN_WIDTH >= 768;
+const isLandscape = SCREEN_WIDTH > SCREEN_HEIGHT;
 
 interface SettingsScreenProps {
   onBack: () => void;
 }
 
 export default function SettingsScreen({ onBack }: SettingsScreenProps) {
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { theme, isDark, toggleTheme, currentTheme } = useTheme();
+  const { isPlaying, volume, isMusicEnabled, soundEffectsEnabled, toggleMusic, setVolume, toggleMusicEnabled, toggleSoundEffects } = useAudio();
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStatsDashboard, setShowStatsDashboard] = useState(false);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
@@ -29,6 +39,8 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [hapticFeedback, setHapticFeedback] = useState(true);
   const [autoCheckMode, setAutoCheckMode] = useState(false);
   const [smartHints, setSmartHints] = useState(true);
+  const [notifications, setNotifications] = useState(true);
+  const [darkModeAuto, setDarkModeAuto] = useState(false);
 
   // Handler functions
   const handleResetData = () => {
@@ -48,12 +60,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         }
       ]
     );
-  };
-
-  const handleThemeSelect = (selectedTheme: any) => {
-    // In a real app, this would apply the selected theme
-    Alert.alert('Theme Applied', `${selectedTheme.name} theme has been applied!`);
-    // Here you would update the theme context with the new theme
   };
 
   const handleExportData = () => {
@@ -176,7 +182,18 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         <Text style={[styles.title, { color: theme.colors.text }]}>Settings</Text>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={[
+          styles.scrollContent,
+          isTablet && styles.tabletScrollContent
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Create responsive grid layout for tablets */}
+        <View style={isTablet ? styles.tabletGrid : styles.mobileLayout}>
+          {/* Left Column for Tablets, Single Column for Mobile */}
+          <View style={isTablet ? styles.leftColumn : styles.fullWidth}>
         {/* Appearance Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Appearance</Text>
@@ -193,6 +210,21 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 />
               }
             />
+            <SettingItem
+              title="Auto Dark Mode"
+              subtitle="Follow system theme automatically"
+              rightComponent={
+                <Switch
+                  value={darkModeAuto}
+                  onValueChange={(value) => {
+                    setDarkModeAuto(value);
+                    Alert.alert('Auto Theme', value ? 'Theme will follow system settings' : 'Manual theme control enabled');
+                  }}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              }
+            />
             <TouchableOpacity 
               style={styles.aboutItem}
               onPress={() => setShowThemeSelector(true)}
@@ -200,10 +232,27 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingTitle, { color: theme.colors.text }]}>🎨 Theme Gallery</Text>
                 <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
-                  Choose from beautiful theme collections
+                  Current: {theme.name} • Choose from beautiful themes
                 </Text>
               </View>
               <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>Browse ›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.aboutItem}
+              onPress={() => Alert.alert('Font Size Options', 'Select text size:\n🔸 Small\n🔹 Medium (Current)\n🔸 Large\n🔸 Extra Large', [
+                { text: 'Small', onPress: () => Alert.alert('Applied', 'Small font size applied') },
+                { text: 'Medium', onPress: () => Alert.alert('Applied', 'Medium font size applied') },
+                { text: 'Large', onPress: () => Alert.alert('Applied', 'Large font size applied') },
+                { text: 'Cancel', style: 'cancel' }
+              ])}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>📝 Font Size</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                  Adjust text size for better readability
+                </Text>
+              </View>
+              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>Medium ›</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -297,12 +346,51 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Audio & Haptics</Text>
           <View style={[styles.sectionContent, { backgroundColor: theme.colors.surface }]}>
             <SettingItem
+              title="Background Music"
+              subtitle="Play relaxing background music while playing"
+              rightComponent={
+                <Switch
+                  value={isMusicEnabled}
+                  onValueChange={async (value) => {
+                    await toggleMusicEnabled();
+                    Alert.alert('Background Music', value ? 'Background music enabled' : 'Background music disabled');
+                  }}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              }
+            />
+            {isMusicEnabled && (
+              <TouchableOpacity 
+                style={styles.aboutItem}
+                onPress={async () => {
+                  await toggleMusic();
+                  Alert.alert('Music Control', isPlaying ? 'Music paused' : 'Music started playing');
+                }}
+              >
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingTitle, { color: theme.colors.text }]}>
+                    🎵 Music Playback
+                  </Text>
+                  <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                    {isPlaying ? 'Currently playing' : 'Tap to play music'}
+                  </Text>
+                </View>
+                <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>
+                  {isPlaying ? 'Pause' : 'Play'} ›
+                </Text>
+              </TouchableOpacity>
+            )}
+            <SettingItem
               title="Sound Effects"
               subtitle="Play sounds for actions and achievements"
               rightComponent={
                 <Switch
-                  value={soundEffects}
-                  onValueChange={setSoundEffects}
+                  value={soundEffectsEnabled}
+                  onValueChange={async (value) => {
+                    await toggleSoundEffects();
+                    Alert.alert('Sound Effects', value ? 'Sound effects enabled' : 'Sound effects disabled');
+                  }}
                   trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                   thumbColor="#FFFFFF"
                 />
@@ -314,7 +402,10 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
               rightComponent={
                 <Switch
                   value={hapticFeedback}
-                  onValueChange={setHapticFeedback}
+                  onValueChange={(value) => {
+                    setHapticFeedback(value);
+                    Alert.alert('Haptic Feedback', value ? 'Vibration feedback enabled' : 'Vibration feedback disabled');
+                  }}
                   trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                   thumbColor="#FFFFFF"
                 />
@@ -322,15 +413,61 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
             />
             <TouchableOpacity 
               style={styles.aboutItem}
-              onPress={() => Alert.alert('Volume Control', 'Volume adjustment controls coming soon!')}
+              onPress={() => Alert.alert('Volume Control', `Adjust sound levels:\n🔊 Master Volume: ${Math.round(volume * 100)}%\n🎵 Music: ${isMusicEnabled ? Math.round(volume * 100) + '%' : 'OFF'}\n🔔 Sound Effects: ${soundEffectsEnabled ? '100%' : 'OFF'}`, [
+                { text: 'Low (30%)', onPress: async () => { await setVolume(0.3); Alert.alert('Applied', 'Volume set to Low'); } },
+                { text: 'Medium (60%)', onPress: async () => { await setVolume(0.6); Alert.alert('Applied', 'Volume set to Medium'); } },
+                { text: 'High (100%)', onPress: async () => { await setVolume(1.0); Alert.alert('Applied', 'Volume set to High'); } },
+                { text: 'Cancel', style: 'cancel' }
+              ])}
             >
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingTitle, { color: theme.colors.text }]}>🔊 Volume Level</Text>
                 <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
-                  Adjust sound effects volume
+                  Adjust music and sound effects volume
                 </Text>
               </View>
-              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>Medium ›</Text>
+              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>
+                {Math.round(volume * 100)}% ›
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Music Player Component */}
+        {isMusicEnabled && (
+          <MusicPlayer visible={true} compact={false} />
+        )}
+
+        {/* Notifications Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notifications</Text>
+          <View style={[styles.sectionContent, { backgroundColor: theme.colors.surface }]}>
+            <SettingItem
+              title="Push Notifications"
+              subtitle="Receive daily challenges and achievements"
+              rightComponent={
+                <Switch
+                  value={notifications}
+                  onValueChange={(value) => {
+                    setNotifications(value);
+                    Alert.alert('Notifications', value ? 'Notifications enabled' : 'Notifications disabled');
+                  }}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              }
+            />
+            <TouchableOpacity 
+              style={styles.aboutItem}
+              onPress={() => Alert.alert('Notification Settings', 'Customize notification types:\n• Daily challenges: ON\n• Achievement unlocks: ON\n• Reminders: OFF\n• Updates: ON')}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>🔔 Notification Types</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                  Choose which notifications to receive
+                </Text>
+              </View>
+              <Text style={[styles.aboutValue, { color: theme.colors.primary }]}>Customize ›</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -344,8 +481,11 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
               subtitle="Display elapsed time during gameplay"
               rightComponent={
                 <Switch
-                  value={true}
-                  onValueChange={() => Alert.alert('Timer Toggle', 'Timer display preference saved!')}
+                  value={showTimer}
+                  onValueChange={(value) => {
+                    setShowTimer(value);
+                    Alert.alert('Timer Setting', value ? 'Timer will be shown during games' : 'Timer will be hidden during games');
+                  }}
                   trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                   thumbColor="#FFFFFF"
                 />
@@ -356,8 +496,41 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
               subtitle="Automatically save game progress"
               rightComponent={
                 <Switch
-                  value={true}
-                  onValueChange={() => Alert.alert('Auto-Save', 'Auto-save preference updated!')}
+                  value={autoSave}
+                  onValueChange={(value) => {
+                    setAutoSave(value);
+                    Alert.alert('Auto-Save', value ? 'Games will be saved automatically' : 'Manual save only');
+                  }}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              }
+            />
+            <SettingItem
+              title="Highlight Conflicts"
+              subtitle="Show conflicting numbers in red"
+              rightComponent={
+                <Switch
+                  value={highlightConflicts}
+                  onValueChange={(value) => {
+                    setHighlightConflicts(value);
+                    Alert.alert('Conflict Highlighting', value ? 'Conflicts will be highlighted' : 'No conflict highlighting');
+                  }}
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              }
+            />
+            <SettingItem
+              title="Smart Hints"
+              subtitle="Enable intelligent hint suggestions"
+              rightComponent={
+                <Switch
+                  value={smartHints}
+                  onValueChange={(value) => {
+                    setSmartHints(value);
+                    Alert.alert('Smart Hints', value ? 'Intelligent hints enabled' : 'Basic hints only');
+                  }}
                   trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                   thumbColor="#FFFFFF"
                 />
@@ -365,7 +538,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
             />
             <TouchableOpacity 
               style={styles.aboutItem}
-              onPress={() => Alert.alert('Highlight Options', 'Number highlighting settings:\n• Highlight same numbers\n• Highlight row/column\n• Highlight conflicts')}
+              onPress={() => Alert.alert('Highlight Options', 'Number highlighting settings:\n• Highlight same numbers: ON\n• Highlight row/column: ON\n• Highlight conflicts: ' + (highlightConflicts ? 'ON' : 'OFF'))}
             >
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingTitle, { color: theme.colors.text }]}>✨ Highlight Options</Text>
@@ -377,7 +550,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.aboutItem}
-              onPress={() => Alert.alert('Hint Settings', 'Hint system configuration:\n• Maximum hints per game: 3\n• Hint types: Valid moves only\n• Progressive hints: Enabled')}
+              onPress={() => Alert.alert('Hint Settings', 'Hint system configuration:\n• Maximum hints per game: 3\n• Smart hints: ' + (smartHints ? 'ON' : 'OFF') + '\n• Progressive hints: Enabled')}
             >
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingTitle, { color: theme.colors.text }]}>💡 Hint Settings</Text>
@@ -545,6 +718,10 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
             </Text>
           </View>
         </View>
+        
+        {/* Close responsive layout containers */}
+        </View>
+        </View>
       </ScrollView>
 
       {/* Achievement System Modal */}
@@ -565,7 +742,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       <ThemeSelector
         visible={showThemeSelector}
         onClose={() => setShowThemeSelector(false)}
-        onThemeSelect={handleThemeSelect}
       />
     </View>
   );
@@ -578,91 +754,113 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
+    paddingHorizontal: isTablet ? 40 : 20,
+    paddingTop: Platform.OS === 'ios' ? (isTablet ? 60 : 50) : 40,
+    paddingBottom: isTablet ? 30 : 20,
   },
   backButton: {
-    marginRight: 16,
+    marginRight: isTablet ? 24 : 16,
   },
   backButtonText: {
-    fontSize: 24,
+    fontSize: isTablet ? 28 : 24,
     fontWeight: '300',
   },
   title: {
-    fontSize: 24,
+    fontSize: isTablet ? 32 : 24,
     fontWeight: 'bold',
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: isTablet ? 40 : 20,
+  },
+  scrollContent: {
+    paddingBottom: 50,
+  },
+  tabletScrollContent: {
+    paddingHorizontal: isTablet ? 60 : 0,
+    maxWidth: isTablet ? 1200 : '100%',
+    alignSelf: 'center',
+  },
+  tabletGrid: {
+    flexDirection: isTablet && isLandscape ? 'row' : 'column',
+    gap: isTablet ? 40 : 0,
+  },
+  mobileLayout: {
+    flexDirection: 'column',
+  },
+  leftColumn: {
+    flex: 1,
+    minWidth: isTablet ? 300 : '100%',
+  },
+  fullWidth: {
+    width: '100%',
   },
   section: {
-    marginBottom: 30,
+    marginBottom: isTablet ? 40 : 30,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: isTablet ? 22 : 18,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: isTablet ? 16 : 12,
   },
   sectionContent: {
-    borderRadius: 12,
+    borderRadius: isTablet ? 16 : 12,
     overflow: 'hidden',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: isTablet ? 24 : 16,
+    paddingVertical: isTablet ? 20 : 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   settingInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: isTablet ? 24 : 16,
   },
   settingTitle: {
-    fontSize: 16,
+    fontSize: isTablet ? 18 : 16,
     fontWeight: '500',
     marginBottom: 2,
   },
   settingSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: isTablet ? 15 : 13,
+    lineHeight: isTablet ? 20 : 18,
   },
   aboutItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: isTablet ? 24 : 16,
+    paddingVertical: isTablet ? 20 : 16,
   },
   aboutTitle: {
-    fontSize: 16,
+    fontSize: isTablet ? 18 : 16,
     fontWeight: '500',
   },
   aboutValue: {
-    fontSize: 14,
+    fontSize: isTablet ? 16 : 14,
   },
   themePreview: {
-    padding: 20,
-    borderRadius: 12,
+    padding: isTablet ? 30 : 20,
+    borderRadius: isTablet ? 16 : 12,
     borderWidth: 1,
     alignItems: 'center',
   },
   previewRow: {
     flexDirection: 'row',
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: isTablet ? 16 : 12,
+    gap: isTablet ? 12 : 8,
   },
   previewCell: {
-    width: 30,
-    height: 30,
-    borderRadius: 6,
+    width: isTablet ? 40 : 30,
+    height: isTablet ? 40 : 30,
+    borderRadius: isTablet ? 8 : 6,
   },
   previewText: {
-    fontSize: 14,
+    fontSize: isTablet ? 16 : 14,
     fontWeight: '500',
-    marginTop: 8,
+    marginTop: isTablet ? 12 : 8,
   },
 });

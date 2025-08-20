@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { GameRecord, SavedGame, clearCurrentGame, formatTime, saveGameRecord } from '../utils/gameStorage';
 import { isPuzzleComplete, isValidMove, isValidSudoku } from '../utils/sudokuLogic';
 import AnimatedCelebration from './AnimatedCelebration';
+import { FloatingMusicControl } from './FloatingMusicControl';
 import GameControls from './GameControls';
 import HintSystem from './HintSystem';
 import NumberHighlight from './NumberHighlight';
@@ -11,6 +12,11 @@ import NumberPad from './NumberPad';
 import PauseMenu from './PauseMenu';
 import ProgressStats from './ProgressStats';
 import SudokuGrid from './SudokuGrid';
+
+// Get screen dimensions and calculate responsive values
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isTablet = SCREEN_WIDTH >= 768;
+const isLandscape = SCREEN_WIDTH > SCREEN_HEIGHT;
 
 interface SudokuGameProps {
   savedGame: SavedGame;
@@ -466,36 +472,43 @@ export default function SudokuGame({
         </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content */}
+      {/* Responsive Content Layout */}
       <ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isTablet && styles.tabletScrollContent
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Enhanced Progress Stats */}
-        <ProgressStats
-          timeElapsed={timeElapsed}
-          moves={moves}
-          hintsUsed={hintsUsed}
-          completionPercentage={getCompletionPercentage()}
-          wrongMoves={wrongMoves}
-        />
+        {/* Responsive Grid Layout */}
+        <View style={isTablet && isLandscape ? styles.tabletLandscapeLayout : styles.mobileLayout}>
+          {/* Left side - Game Grid and Stats */}
+          <View style={isTablet && isLandscape ? styles.gameSection : styles.fullWidth}>
+            {/* Enhanced Progress Stats */}
+            <ProgressStats
+              timeElapsed={timeElapsed}
+              moves={moves}
+              hintsUsed={hintsUsed}
+              completionPercentage={getCompletionPercentage()}
+              wrongMoves={wrongMoves}
+            />
 
-        {/* Game Controls */}
-        <GameControls
-          onPause={handlePauseResume}
-          onSettings={onSettings || (() => {})}
-          onRestart={() => setShowRestartConfirmModal(true)}
-          onUndo={handleUndo}
-          onAutoCheck={toggleAutoCheck}
-          isPaused={isPaused}
-          canUndo={moveHistory.length > 0}
-          autoCheckEnabled={autoCheckEnabled}
-        />
+            {/* Game Controls */}
+            <GameControls
+              onPause={handlePauseResume}
+              onSettings={onSettings || (() => {})}
+              onRestart={() => setShowRestartConfirmModal(true)}
+              onUndo={handleUndo}
+              onAutoCheck={toggleAutoCheck}
+              isPaused={isPaused}
+              canUndo={moveHistory.length > 0}
+              autoCheckEnabled={autoCheckEnabled}
+            />
 
-      {/* Edit Mode Toggle */}
-      {!isPaused && (
-        <View style={styles.editModeContainer}>
+          {/* Edit Mode Toggle */}
+          {!isPaused && (
+            <View style={styles.editModeContainer}>
           <TouchableOpacity
             style={[
               styles.editModeButton,
@@ -613,6 +626,10 @@ export default function SudokuGame({
           Selected: Row {selectedCell.row + 1}, Column {selectedCell.col + 1}
         </Text>
       )}
+      
+      {/* Close responsive layout containers */}
+      </View>
+      </View>
       </ScrollView>
 
       {/* Pause Overlay */}
@@ -795,6 +812,14 @@ export default function SudokuGame({
         type={celebration.type}
         duration={1000}
       />
+      
+      {/* Floating Music Control */}
+      <FloatingMusicControl 
+        position="top-right"
+        onPress={() => {
+          // Optional: Could open a mini music player or just toggle
+        }}
+      />
     </View>
   );
 }
@@ -802,31 +827,51 @@ export default function SudokuGame({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: isTablet ? 32 : 16,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: isTablet ? 40 : 20,
+  },
+  tabletScrollContent: {
+    paddingHorizontal: isTablet ? 40 : 0,
+    maxWidth: isTablet ? 1400 : '100%',
+    alignSelf: 'center',
+  },
+  tabletLandscapeLayout: {
+    flexDirection: 'row',
+    gap: 40,
+    alignItems: 'flex-start',
+  },
+  mobileLayout: {
+    flexDirection: 'column',
+  },
+  gameSection: {
+    flex: 1.2,
+    minWidth: 300,
+  },
+  fullWidth: {
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 8,
-    marginHorizontal: -8,
-    borderRadius: 16,
-    marginBottom: 8,
+    paddingTop: Platform.OS === 'ios' ? (isTablet ? 60 : 50) : 40,
+    paddingBottom: isTablet ? 20 : 16,
+    paddingHorizontal: isTablet ? 16 : 8,
+    marginHorizontal: isTablet ? -16 : -8,
+    borderRadius: isTablet ? 20 : 16,
+    marginBottom: isTablet ? 16 : 8,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: isTablet ? 6 : 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: isTablet ? 12 : 8,
+    elevation: isTablet ? 8 : 6,
   },
   backButton: {
     width: 60,

@@ -14,6 +14,8 @@ import { Difficulty } from '../utils/sudokuLogic';
 import DailyChallengeCard from './DailyChallengeCard';
 
 const { width, height } = Dimensions.get('window');
+const isTablet = width >= 768;
+const isLandscape = width > height;
 
 interface MainMenuProps {
   onContinueGame: () => void;
@@ -176,8 +178,20 @@ export default function MainMenu({
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.mainScrollView} contentContainerStyle={styles.mainScrollContent}>
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+      <ScrollView 
+        style={styles.mainScrollView} 
+        contentContainerStyle={[
+          styles.mainScrollContent,
+          isTablet && styles.tabletScrollContent
+        ]}
+      >
+        <Animated.View style={[
+          styles.content, 
+          { opacity: fadeAnim },
+          isTablet && isLandscape && styles.tabletLandscapeContent
+        ]}>
+          {/* Responsive container for tablet layout */}
+          <View style={isTablet && isLandscape ? styles.tabletGrid : styles.mobileLayout}>
           {/* Daily Challenge */}
           <DailyChallengeCard onStartChallenge={onNewGame} />
 
@@ -303,12 +317,15 @@ export default function MainMenu({
           />
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
-            Made with ❤️ for puzzle lovers
-          </Text>
-        </View>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
+              Made with ❤️ for puzzle lovers
+            </Text>
+          </View>
+          
+          {/* Close responsive layout containers */}
+          </View>
         </Animated.View>
       </ScrollView>
     </View>
@@ -323,39 +340,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mainScrollContent: {
-    paddingBottom: 20,
+    paddingBottom: isTablet ? 40 : 20,
+  },
+  tabletScrollContent: {
+    paddingHorizontal: isTablet ? 60 : 0,
+    maxWidth: isTablet ? 1200 : '100%',
+    alignSelf: 'center',
+  },
+  tabletGrid: {
+    flexDirection: 'row',
+    gap: 40,
+    alignItems: 'flex-start',
+  },
+  mobileLayout: {
+    flexDirection: 'column',
+  },
+  tabletLandscapeContent: {
+    maxWidth: 1400,
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+    paddingTop: isTablet ? 60 : 50,
+    paddingBottom: isTablet ? 20 : 16,
+    paddingHorizontal: isTablet ? 40 : 20,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: isTablet ? 6 : 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: isTablet ? 12 : 8,
+    elevation: isTablet ? 8 : 6,
   },
   settingsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: isTablet ? 52 : 44,
+    height: isTablet ? 52 : 44,
+    borderRadius: isTablet ? 26 : 22,
     justifyContent: 'center',
     alignItems: 'center',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: isTablet ? 3 : 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: isTablet ? 6 : 4,
+    elevation: isTablet ? 4 : 3,
   },
   settingsIcon: {
-    fontSize: 20,
+    fontSize: isTablet ? 24 : 20,
   },
   headerTitle: {
     flexDirection: 'row',

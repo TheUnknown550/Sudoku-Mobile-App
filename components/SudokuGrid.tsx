@@ -1,6 +1,22 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+
+// Get screen dimensions and calculate responsive values
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isTablet = SCREEN_WIDTH >= 768;
+const isLandscape = SCREEN_WIDTH > Dimensions.get('window').height;
+
+// Calculate responsive cell size
+const getGridSize = () => {
+  if (isTablet) {
+    return isLandscape ? Math.min(SCREEN_WIDTH * 0.4, 400) : Math.min(SCREEN_WIDTH * 0.7, 500);
+  }
+  return Math.min(SCREEN_WIDTH - 40, 350);
+};
+
+const GRID_SIZE = getGridSize();
+const CELL_SIZE = (GRID_SIZE - 16) / 9; // 16 for padding
 
 interface SudokuGridProps {
   grid: (number | null)[][];
@@ -140,32 +156,34 @@ export default function SudokuGrid({ grid, originalGrid, selectedCell, onCellPre
 
 const styles = StyleSheet.create({
   container: {
-    borderWidth: 3,
-    borderRadius: 12,
+    borderWidth: isTablet ? 4 : 3,
+    borderRadius: isTablet ? 16 : 12,
     backgroundColor: 'transparent',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: isTablet ? 24 : 16,
+    width: GRID_SIZE,
+    height: GRID_SIZE,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: isTablet ? 6 : 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: isTablet ? 12 : 8,
+    elevation: isTablet ? 8 : 6,
   },
   row: {
     flexDirection: 'row',
   },
   cell: {
-    width: 32,
-    height: 32,
+    width: CELL_SIZE,
+    height: CELL_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 4,
+    borderRadius: isTablet ? 6 : 4,
     margin: 0.5,
   },
   cellText: {
-    fontSize: 16,
+    fontSize: isTablet ? 20 : 16,
     textAlign: 'center',
     fontWeight: '600',
   },
@@ -179,7 +197,7 @@ const styles = StyleSheet.create({
     padding: 1,
   },
   noteText: {
-    fontSize: 8,
+    fontSize: isTablet ? 10 : 8,
     width: '33.33%',
     textAlign: 'center',
     lineHeight: 10,

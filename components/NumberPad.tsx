@@ -1,6 +1,21 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+
+// Get screen dimensions and calculate responsive values
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isTablet = SCREEN_WIDTH >= 768;
+const isLandscape = SCREEN_WIDTH > Dimensions.get('window').height;
+
+// Calculate responsive button size
+const getButtonSize = () => {
+  if (isTablet) {
+    return isLandscape ? 60 : 70;
+  }
+  return Math.min((SCREEN_WIDTH - 80) / 5, 50); // 5 buttons per row with spacing
+};
+
+const BUTTON_SIZE = getButtonSize();
 
 interface NumberPadProps {
   onNumberPress: (number: number) => void;
@@ -99,40 +114,40 @@ export default function NumberPad({ onNumberPress, onClearPress, disabled, curre
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: isTablet ? 16 : 8,
+    paddingHorizontal: isTablet ? 16 : 8,
   },
   title: {
-    fontSize: 16,
+    fontSize: isTablet ? 20 : 16,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: isTablet ? 16 : 12,
     letterSpacing: 0.5,
   },
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
+    gap: isTablet ? 12 : 8,
     paddingHorizontal: 4,
   },
   button: {
-    width: 32,
-    height: 36,
-    borderWidth: 2,
-    borderRadius: 8,
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE + (isTablet ? 8 : 4),
+    borderWidth: isTablet ? 3 : 2,
+    borderRadius: isTablet ? 12 : 8,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: isTablet ? 4 : 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: isTablet ? 6 : 4,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: isTablet ? 20 : 16,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
   spacer: {
-    width: 32,
+    width: BUTTON_SIZE,
     height: 36,
   },
 });
