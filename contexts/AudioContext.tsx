@@ -61,7 +61,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       // Load the background music file
       await loadBackgroundMusic();
-      console.log('Audio system initialized');
     } catch (error) {
       console.error('Error setting up audio:', error);
     }
@@ -107,22 +106,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       );
       
       setSound(newSound);
-      console.log(`Background music "Charm" loaded successfully using ${loadMethod}`);
     } catch (error) {
       console.warn('Could not load background music file:', error);
-      console.log('Music controls will work in demo mode');
       // Continue without music file - the app will work in demo mode
     }
   };
 
   const toggleMusic = async () => {
-    console.log('toggleMusic called');
-    console.log('isMusicEnabled:', isMusicEnabled);
-    console.log('current isPlaying:', isPlaying);
-    console.log('sound object:', sound);
-    
     if (!isMusicEnabled) {
-      console.log('Music is not enabled, returning');
       return;
     }
 
@@ -130,24 +121,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!sound) {
         // If no sound file is loaded, work in demo mode
         setIsPlaying(!isPlaying);
-        console.log('Music toggle (demo mode):', !isPlaying ? 'Playing' : 'Paused');
         return;
       }
 
       if (isPlaying) {
         await sound.pauseAsync();
         setIsPlaying(false);
-        console.log('Music paused');
       } else {
         await sound.playAsync();
         setIsPlaying(true);
-        console.log('Music playing');
       }
     } catch (error) {
       console.error('Error toggling music:', error);
       // Fallback to demo mode
       setIsPlaying(!isPlaying);
-      console.log('Fallback to demo mode, new state:', !isPlaying);
     }
   };
 
@@ -191,7 +178,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const playSound = (effect: string) => {
     if (soundEffectsEnabled) {
-      console.log(`🔊 Playing sound effect: ${effect}`);
       // Here you would call the actual sound effects system
       // soundEffects.playSound(effect as SoundEffect);
     }

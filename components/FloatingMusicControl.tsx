@@ -54,17 +54,11 @@ export const FloatingMusicControl: React.FC<FloatingMusicControlProps> = ({
   };
 
   const handlePress = () => {
-    console.log('FloatingMusicControl pressed');
-    console.log('isPlaying:', isPlaying);
-    console.log('isMusicEnabled:', isMusicEnabled);
-    
     // Always call toggleMusic first
-    console.log('Calling toggleMusic');
     toggleMusic();
     
     // Then call custom onPress if provided (for additional functionality)
     if (onPress) {
-      console.log('Calling custom onPress');
       onPress();
     }
   };
