@@ -1,75 +1,147 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import HistoryRecords from '@/components/HistoryRecords';
+import MainMenu from '@/components/MainMenu';
+import SettingsScreen from '@/components/SettingsScreen';
+import SudokuGame from '@/components/SudokuGame';
+import { useTheme } from '@/contexts/ThemeContext';
+import {
+  clearCurrentGame,
+  GameRecord,
+  generateGameId,
+  loadCurrentGame,
+  saveCurrentGame,
+  SavedGame,
+  saveGameRecord
+} from '@/utils/gameStorage';
+import { Difficulty, generateSudoku } from '@/utils/sudokuLogic';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+type AppState = 'menu' | 'game' | 'history' | 'settings';
 
 export default function HomeScreen() {
+  const { theme } = useTheme();
+  const [appState, setAppState] = useState<AppState>('menu');
+  const [previousState, setPreviousState] = useState<AppState>('menu');
+  const [currentGame, setCurrentGame] = useState<SavedGame | null>(null);
+  const [gameKey, setGameKey] = useState(0);
+
+  useEffect(() => {
+    loadSavedGame();
+  }, []);
+
+  const loadSavedGame = async () => {
+    const saved = await loadCurrentGame();
+    setCurrentGame(saved);
+  };
+
+  const handleContinueGame = () => {
+    setAppState('game');
+  };
+
+  const handleViewHistory = () => {
+    setPreviousState(appState);
+    setAppState('history');
+  };
+
+  const handleSettings = () => {
+    setPreviousState(appState);
+    setAppState('settings');
+  };
+
+  const handleNewGame = async (difficulty: Difficulty) => {
+    // Generate new game directly
+    const puzzle = generateSudoku(difficulty);
+    const gameId = generateGameId();
+    const now = Date.now();
+    
+    const newGame: SavedGame = {
+      id: gameId,
+      difficulty,
+      currentGrid: puzzle,
+      originalGrid: JSON.parse(JSON.stringify(puzzle)), // Deep copy
+      timeStarted: now,
+      timeElapsed: 0,
+      moves: 0,
+      lastPlayed: now,
+    };
+
+    setCurrentGame(newGame);
+    await saveCurrentGame(newGame);
+    setGameKey(prev => prev + 1);
+    setAppState('game');
+  };
+
+  const handleGameComplete = async (game: SavedGame, duration: number) => {
+    // Save completed game record
+    const record: GameRecord = {
+      id: game.id,
+      difficulty: game.difficulty,
+      timeStarted: game.timeStarted,
+      timeCompleted: Date.now(),
+      duration,
+      completed: true,
+      moves: game.moves,
+    };
+
+    await saveGameRecord(record);
+    await clearCurrentGame();
+    setCurrentGame(null);
+  };
+
+  const handleGameSave = async (game: SavedGame) => {
+    setCurrentGame(game);
+    await saveCurrentGame(game);
+  };
+
+  const handleBackToMenu = () => {
+    setAppState('menu');
+  };
+
+  const handleBackToPrevious = () => {
+    setAppState(previousState);
+  };
+
+  const handleRestartGame = () => {
+    // This will be handled by the new pause menu
+    setAppState('menu');
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {appState === 'menu' && (
+        <MainMenu
+          onContinueGame={handleContinueGame}
+          onNewGame={handleNewGame}
+          onViewHistory={handleViewHistory}
+          onSettings={handleSettings}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      )}
+
+      {appState === 'game' && currentGame && (
+        <SudokuGame
+          key={gameKey}
+          savedGame={currentGame}
+          onGameComplete={handleGameComplete}
+          onGameSave={handleGameSave}
+          onBackToMenu={handleBackToMenu}
+          onRestart={handleRestartGame}
+          onSettings={handleSettings}
+        />
+      )}
+
+      {appState === 'history' && (
+        <HistoryRecords onBack={handleBackToMenu} />
+      )}
+
+      {appState === 'settings' && (
+        <SettingsScreen onBack={handleBackToPrevious} />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  container: {
+    flex: 1,
   },
 });
