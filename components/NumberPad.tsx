@@ -6,10 +6,38 @@ interface NumberPadProps {
   onNumberPress: (number: number) => void;
   onClearPress: () => void;
   disabled: boolean;
+  currentGrid: number[][];
 }
 
-export default function NumberPad({ onNumberPress, onClearPress, disabled }: NumberPadProps) {
+export default function NumberPad({ onNumberPress, onClearPress, disabled, currentGrid }: NumberPadProps) {
   const { theme } = useTheme();
+
+  // Function to check if a number is complete (appears 9 times) in the grid
+  const getAvailableNumbers = () => {
+    const numberCounts: { [key: number]: number } = {};
+    
+    // Count occurrences of each number in the grid
+    for (let row = 0; row < 9; row++) {
+      for (let col = 0; col < 9; col++) {
+        const num = currentGrid[row][col];
+        if (num !== 0) {
+          numberCounts[num] = (numberCounts[num] || 0) + 1;
+        }
+      }
+    }
+    
+    // Return numbers that appear less than 9 times
+    const availableNumbers: number[] = [];
+    for (let i = 1; i <= 9; i++) {
+      if ((numberCounts[i] || 0) < 9) {
+        availableNumbers.push(i);
+      }
+    }
+    
+    return availableNumbers;
+  };
+
+  const availableNumbers = getAvailableNumbers();
 
   const renderButton = (content: string | number, onPress: () => void, isSpecial = false) => {
     return (
@@ -59,9 +87,9 @@ export default function NumberPad({ onNumberPress, onClearPress, disabled }: Num
         {disabled ? 'Select a cell first' : 'Choose a number'}
       </Text>
       
-      {/* Single row: 1-9 + Clear */}
+      {/* Single row: Available numbers + Clear */}
       <View style={styles.row}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => renderButton(num, () => onNumberPress(num)))}
+        {availableNumbers.map(num => renderButton(num, () => onNumberPress(num)))}
         {renderButton('X', onClearPress, true)}
       </View>
     </View>

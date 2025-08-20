@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { SavedGame, formatTime } from '../utils/gameStorage';
 import { isPuzzleComplete, isValidMove, isValidSudoku } from '../utils/sudokuLogic';
@@ -37,6 +37,10 @@ export default function SudokuGame({
   const [wrongCells, setWrongCells] = useState<{[key: string]: boolean}>({});
   const [editMode, setEditMode] = useState(false);
   const [notes, setNotes] = useState<{[key: string]: number[]}>({});
+  const [showWinModal, setShowWinModal] = useState(false);
+  const [showGameOverModal, setShowGameOverModal] = useState(false);
+  const [showRestartConfirmModal, setShowRestartConfirmModal] = useState(false);
+  const [winTime, setWinTime] = useState(0);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateRef = useRef(Date.now());
@@ -55,20 +59,15 @@ export default function SudokuGame({
   useEffect(() => {
     // Check if puzzle is complete
     if (grid.length > 0 && isPuzzleComplete(grid) && isValidSudoku(grid)) {
+      console.log('Win condition detected, showing modal');
       setIsComplete(true);
       stopTimer();
       const finalDuration = timeElapsed;
+      setWinTime(finalDuration);
+      setShowWinModal(true);
       
-      Alert.alert(
-        '🎉 Congratulations!',
-        `You solved the ${savedGame.difficulty} puzzle in ${formatTime(finalDuration)}!`,
-        [
-          { text: 'New Game', onPress: onRestart },
-          { text: 'Main Menu', onPress: onBackToMenu },
-        ]
-      );
-      
-      // Save completed game
+      // Don't call onGameComplete immediately - let the modal handle it
+      // Save completed game for later
       const completedGame: SavedGame = {
         ...savedGame,
         currentGrid: grid,
@@ -77,7 +76,8 @@ export default function SudokuGame({
         lastPlayed: Date.now(),
       };
       
-      onGameComplete(completedGame, finalDuration);
+      // Store completed game data but don't call onGameComplete yet
+      // onGameComplete(completedGame, finalDuration);
     }
   }, [grid]);
 
@@ -171,14 +171,7 @@ export default function SudokuGame({
           setWrongMoves(prev => {
             const newCount = prev + 1;
             if (newCount >= 3) {
-              Alert.alert(
-                'Game Over',
-                'You have made 3 wrong moves. Game ended.',
-                [
-                  { text: 'Restart', onPress: onRestart },
-                  { text: 'Main Menu', onPress: onBackToMenu }
-                ]
-              );
+              setShowGameOverModal(true);
             }
             return newCount;
           });
@@ -335,6 +328,32 @@ export default function SudokuGame({
         >
           <Text style={[styles.headerButtonText, { color: theme.colors.textSecondary }]}>⋯</Text>
         </TouchableOpacity>
+        
+        {/* Auto-Win Test Button */}
+        <TouchableOpacity 
+          style={[styles.headerButton, { 
+            backgroundColor: theme.colors.warning,
+            shadowColor: theme.colors.shadow,
+          }]} 
+          onPress={() => {
+            console.log('Auto-win triggered');
+            // Create a simple solved grid for testing
+            const solvedGrid = [
+              [1, 2, 3, 4, 5, 6, 7, 8, 9],
+              [4, 5, 6, 7, 8, 9, 1, 2, 3],
+              [7, 8, 9, 1, 2, 3, 4, 5, 6],
+              [2, 3, 4, 5, 6, 7, 8, 9, 1],
+              [5, 6, 7, 8, 9, 1, 2, 3, 4],
+              [8, 9, 1, 2, 3, 4, 5, 6, 7],
+              [3, 4, 5, 6, 7, 8, 9, 1, 2],
+              [6, 7, 8, 9, 1, 2, 3, 4, 5],
+              [9, 1, 2, 3, 4, 5, 6, 7, 8]
+            ];
+            setGrid(solvedGrid);
+          }}
+        >
+          <Text style={[styles.headerButtonText, { color: theme.colors.background }]}>WIN</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Scrollable Content */}
@@ -381,6 +400,11 @@ export default function SudokuGame({
           <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Wrong</Text>
         </View>
       </View>
+
+      {/* Debug Info */}
+      <Text style={{color: theme.colors.text, textAlign: 'center', marginVertical: 5, fontSize: 12}}>
+        Win: {showWinModal ? 'YES' : 'NO'} | GameOver: {showGameOverModal ? 'YES' : 'NO'} | Complete: {isComplete ? 'YES' : 'NO'}
+      </Text>
 
       {/* Edit Mode Toggle */}
       {!isPaused && (
@@ -472,6 +496,7 @@ export default function SudokuGame({
           onNumberPress={handleNumberPress}
           onClearPress={handleClearPress}
           disabled={!selectedCell || isComplete}
+          currentGrid={grid}
         />
       )}
 
@@ -514,6 +539,80 @@ export default function SudokuGame({
           onClose={handlePauseMenuClose}
         />
       )}
+
+      {/* Win Modal - Copy of Game Over Modal Structure */}
+      <Modal
+        visible={showWinModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowWinModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>🎉 Congratulations!</Text>
+            <Text style={[styles.modalText, { color: theme.colors.text }]}>
+              You solved the {savedGame.difficulty} puzzle in {formatTime(winTime)}!
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => {
+                  setShowWinModal(false);
+                  onRestart();
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: theme.colors.background }]}>New Game</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: theme.colors.border }]}
+                onPress={() => {
+                  setShowWinModal(false);
+                  onBackToMenu();
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Main Menu</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Game Over Modal */}
+      <Modal
+        visible={showGameOverModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowGameOverModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Game Over</Text>
+            <Text style={[styles.modalText, { color: theme.colors.text }]}>
+              You have made 3 wrong moves. Game ended.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => {
+                  setShowGameOverModal(false);
+                  onRestart();
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: theme.colors.background }]}>Restart</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonSecondary, { borderColor: theme.colors.border }]}
+                onPress={() => {
+                  setShowGameOverModal(false);
+                  onBackToMenu();
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Main Menu</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -706,5 +805,57 @@ const styles = StyleSheet.create({
   editModeText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    borderRadius: 20,
+    padding: 30,
+    minWidth: 300,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 25,
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  modalButton: {
+    paddingHorizontal: 25,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  modalButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

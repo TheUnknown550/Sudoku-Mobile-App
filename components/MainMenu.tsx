@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
     Animated,
     Dimensions,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -174,9 +175,10 @@ export default function MainMenu({
         <View style={styles.headerSpacer} />
       </View>
 
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        {/* User Stats Summary */}
-        {userStats && userStats.totalGamesCompleted > 0 && (
+      <ScrollView style={styles.mainScrollView} contentContainerStyle={styles.mainScrollContent}>
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+          {/* User Stats Summary */}
+          {userStats && userStats.totalGamesCompleted > 0 && (
           <View style={[styles.statsContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <Text style={[styles.statsTitle, { color: theme.colors.text }]}>📊 Your Records</Text>
             <View style={styles.statsGrid}>
@@ -303,7 +305,8 @@ export default function MainMenu({
             Made with ❤️ for puzzle lovers
           </Text>
         </View>
-      </Animated.View>
+        </Animated.View>
+      </ScrollView>
     </View>
   );
 }
@@ -311,6 +314,12 @@ export default function MainMenu({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  mainScrollView: {
+    flex: 1,
+  },
+  mainScrollContent: {
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',

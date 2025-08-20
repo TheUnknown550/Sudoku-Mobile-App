@@ -38,7 +38,7 @@ export default function SudokuGrid({ grid, originalGrid, selectedCell, onCellPre
       backgroundColor = theme.mode === 'dark' ? '#7f1d1d' : '#dc2626';
       borderColor = '#dc2626';
     } else if (isSelected) {
-      backgroundColor = theme.mode === 'dark' ? '#1e40af' : '#3b82f6';
+      backgroundColor = theme.mode === 'dark' ? '#1e40af' : '#87ace7ff';
       borderColor = '#2563eb';
     } else if (isHighlighted) {
       backgroundColor = theme.mode === 'dark' ? '#312e81' : '#e0e7ff';
